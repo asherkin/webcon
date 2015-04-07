@@ -1,0 +1,19 @@
+"Games"
+{	
+	"#default"
+	{
+		"#supported"
+		{
+			"game"	"tf"
+		}
+		
+		"Signatures"
+		{
+			"ProcessAccept"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN14CSocketCreator13ProcessAcceptEv"
+			}
+		}
+	}
+}

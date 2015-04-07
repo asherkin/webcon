@@ -1,0 +1,27 @@
+# vim: sts=2 ts=8 sw=2 tw=99 et ft=python: 
+import os, platform
+
+builder.SetBuildFolder('libmicrohttpd')
+
+binary = builder.compiler.StaticLibrary('microhttpd')
+binary.compiler.includes += [
+  os.path.join(builder.sourcePath, 'libmicrohttpd', 'microhttpd'),
+  os.path.join(builder.sourcePath, 'libmicrohttpd', 'include')
+]
+
+binary.sources += [
+  'libmicrohttpd/microhttpd/connection.c',
+  'libmicrohttpd/microhttpd/reason_phrase.c',
+  'libmicrohttpd/microhttpd/daemon.c',
+  'libmicrohttpd/microhttpd/internal.c',
+  'libmicrohttpd/microhttpd/memorypool.c',
+  'libmicrohttpd/microhttpd/response.c',
+  'libmicrohttpd/microhttpd/tsearch.c',
+  'libmicrohttpd/microhttpd/postprocessor.c',
+  'libmicrohttpd/microhttpd/digestauth.c',
+  'libmicrohttpd/microhttpd/md5.c',
+  'libmicrohttpd/microhttpd/basicauth.c',
+  'libmicrohttpd/microhttpd/base64.c'
+]
+
+rvalue = builder.Add(binary)

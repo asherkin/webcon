@@ -1,0 +1,28 @@
+# vim: set sts=2 ts=8 sw=2 tw=99 et ft=python:
+import os
+
+libmicrohttpd = builder.RunScript('HTTPDBuilder')
+
+project = Webcon.HL2Project(builder, 'webcon.ext')
+
+project.sources += [
+  'extension.cpp',
+  'sdk/smsdk_ext.cpp',
+  'CDetour/detours.cpp',
+  'asm/asm.c',
+]
+
+for sdk_name in Webcon.sdks:
+  sdk = Webcon.sdks[sdk_name]
+
+  binary = Webcon.HL2Config(project, 'webcon.ext.' + sdk.ext, sdk)
+
+  binary.compiler.includes += [
+    os.path.join(builder.sourcePath, 'libmicrohttpd', 'include'),
+  ]
+  
+  binary.compiler.defines += ['SOURCEMOD_BUILD']
+
+  binary.compiler.postlink += [libmicrohttpd.binary]
+
+Webcon.extensions += builder.Add(project)
