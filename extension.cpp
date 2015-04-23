@@ -168,7 +168,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		}
 
 		// We need at least n bytes to identify packets.
-		if (ret < sizeof(buffer)) {
+		if ((size_t)ret < sizeof(buffer)) {
 			pendingSocket->timeout++;
 
 			// About 15 seconds.
@@ -183,7 +183,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		}
 
 		META_CONPRINTF("(%d) Packet Header:", pendingSocket->socket);
-		for (int j = 0; j < sizeof(buffer); ++j) {
+		for (unsigned j = 0; j < sizeof(buffer); ++j) {
 			META_CONPRINTF(" %02X", buffer[j]);
 		}
 		META_CONPRINTF("\n");
