@@ -224,7 +224,7 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 			return MHD_queue_basic_auth_fail_response(connection, "SRCDS", responseUnauthorized);
 		}
 
-		if (strcmp(method, "POST") == 0) {
+		if (strcmp(method, MHD_HTTP_METHOD_POST) == 0) {
 			META_CONPRINTF("SERVER QUIT (honest!)\n");
 
 			return MHD_queue_response(connection, MHD_HTTP_FOUND, responseQuitRedirect);
