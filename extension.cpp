@@ -150,13 +150,13 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 					continue;
 				}
 
-				META_CONPRINTF("(%d) recv error: %d\n", errno);
+				META_CONPRINTF("(%d) recv error: %d\n", WSAGetLastError());
 #else
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
 					continue;
 				}
 
-				META_CONPRINTF("(%d) recv error: %d\n", WSAGetLastError());
+				META_CONPRINTF("(%d) recv error: %d\n", errno);
 #endif
 			}
 
