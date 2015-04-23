@@ -174,8 +174,8 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		}
 
 		META_CONPRINTF("(%d) Packet Header:", pendingSocket->socket);
-		for (int i = 0; i < sizeof(buffer); ++i) {
-			META_CONPRINTF(" %02X", buffer[i]);
+		for (int j = 0; j < sizeof(buffer); ++j) {
+			META_CONPRINTF(" %02X", buffer[j]);
 		}
 		META_CONPRINTF("\n");
 
