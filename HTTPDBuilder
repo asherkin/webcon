@@ -24,4 +24,9 @@ binary.sources += [
   'libmicrohttpd/microhttpd/base64.c'
 ]
 
+if builder.target_platform == 'windows':
+  binary.sources += [
+    'libmicrohttpd/platform/w32functions.c',
+  ]
+
 rvalue = builder.Add(binary)

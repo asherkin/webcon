@@ -24,5 +24,8 @@ for sdk_name in Webcon.sdks:
   binary.compiler.defines += ['SOURCEMOD_BUILD']
 
   binary.compiler.postlink += [libmicrohttpd.binary]
+  
+  if builder.target_platform == 'windows':
+    binary.compiler.linkflags += ['ws2_32.lib']
 
 Webcon.extensions += builder.Add(project)

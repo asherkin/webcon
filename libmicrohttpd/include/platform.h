@@ -34,7 +34,11 @@
 #ifndef MHD_PLATFORM_H
 #define MHD_PLATFORM_H
 
-#include "MHD_config.h"
+#ifdef _WIN32
+#include "MHD_config_win32.h"
+#else
+#include "MHD_config_posix.h"
+#endif
 
 #ifndef BUILDING_MHD_LIB
 #ifdef _MHD_EXTERN

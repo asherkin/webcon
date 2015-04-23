@@ -4,17 +4,18 @@
 #include <netadr.h>
 #include <utlvector.h>
 
-// os stuff (linux)
-#include <sys/types.h>
-#include <sys/socket.h>
+#include "CDetour/detours.h"
+
+#include "microhttpd.h"
+
+#ifndef _WIN32
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <errno.h>
 #include <sys/ioctl.h>
-
-#include "CDetour/detours.h"
-
-#include "microhttpd.h"
+#define closesocket close
+#define ioctlsocket ioctl
+#endif
 
 Webcon g_Webcon;
 SMEXT_LINK(&g_Webcon);
@@ -82,15 +83,15 @@ void CSocketCreator::ProcessAccept()
 	META_CONPRINTF("(%d) New listen socket accepted.\n", socket);
 
 	int opt = 1;
-	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)); 
+	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt)); 
 
 	opt = 1;
-	setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
 
 	opt = 1;
-	if (ioctl(socket, FIONBIO, &opt) == -1) {
+	if (ioctlsocket(socket, FIONBIO, (unsigned long *)&opt) == -1) {
 		META_CONPRINTF("(%d) Failed to set socket options.\n", socket);
-		close(socket);
+		closesocket(socket);
 		return;
 	}
 
@@ -99,7 +100,7 @@ void CSocketCreator::ProcessAccept()
 
 	if (listener && !listener->ShouldAcceptSocket(socket, address)) {
 		META_CONPRINTF("(%d) Listener rejected connection.\n", socket);
-		close(socket);
+		closesocket(socket);
 		return;
 	}
 
@@ -140,18 +141,26 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 	for (int i = (count - 1); i >= 0; --i) {
 		PendingSocket *pendingSocket = &pendingSockets[i];
 
-		ssize_t ret = recv(pendingSocket->socket, buffer, sizeof(buffer), MSG_PEEK);
+		ssize_t ret = recv(pendingSocket->socket, (char *)buffer, sizeof(buffer), MSG_PEEK);
 
 		if (ret <= 0) {
 			if (ret == -1) {
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+#if _WIN32
+				if (WSAGetLastError() == WSAEWOULDBLOCK) {
 					continue;
 				}
 
 				META_CONPRINTF("(%d) recv error: %d\n", errno);
+#else
+				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+					continue;
+				}
+
+				META_CONPRINTF("(%d) recv error: %d\n", WSAGetLastError());
+#endif
 			}
 
-			close(pendingSocket->socket);
+			closesocket(pendingSocket->socket);
 			META_CONPRINTF("(%d) Listen socket closed.\n", pendingSocket->socket);
 
 			pendingSockets.Remove(i);
@@ -164,7 +173,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 
 			// About 15 seconds.
 			if (pendingSocket->timeout > 1000) {
-				close(pendingSocket->socket);
+				closesocket(pendingSocket->socket);
 				META_CONPRINTF("(%d) Listen socket timed out.\n", pendingSocket->socket);
 
 				pendingSockets.Remove(i);
@@ -196,7 +205,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			creator->HandSocketToEngine(pendingSocket);
 			META_CONPRINTF("(%d) Gave RCON socket to engine.\n", pendingSocket->socket);
 		} else {
-			close(pendingSocket->socket);
+			closesocket(pendingSocket->socket);
 			META_CONPRINTF("(%d) Unidentified protocol on socket.\n", pendingSocket->socket);
 		}
 

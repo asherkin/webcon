@@ -12,6 +12,7 @@
 			"ProcessAccept"
 			{
 				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x53\x57\x8D\x45\xF8\xC7\x45\xF8\x10\x00\x00\x00\x50"
 				"linux"		"@_ZN14CSocketCreator13ProcessAcceptEv"
 			}
 		}
