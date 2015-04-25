@@ -223,6 +223,7 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 	}
 
 	if (strcmp(url, "/quit") == 0) {
+		// Yes, everyone knows this is awful, it's test code, shh.
 		char *password = NULL;
 		char *username = MHD_basic_auth_get_username_password(connection, &password);
 		bool authorized = (username && password && strcmp(username, "srcds") == 0 && strcmp(password, "srcds") == 0);
@@ -241,6 +242,8 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 
 		return MHD_queue_response(connection, MHD_HTTP_OK, responseQuitPage);
 	}
+	
+	META_CONPRINTF("Unhandled HTTP %s Request: %s\n", method, url);
 
 	return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 }
