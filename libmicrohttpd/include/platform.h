@@ -36,8 +36,10 @@
 
 #ifdef _WIN32
 #include "MHD_config_win32.h"
+#elif __APPLE__
+#include "MHD_config_osx.h"
 #else
-#include "MHD_config_posix.h"
+#include "MHD_config_linux.h"
 #endif
 
 #ifndef BUILDING_MHD_LIB
