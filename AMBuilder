@@ -3,29 +3,26 @@ import os
 
 libmicrohttpd = builder.RunScript('HTTPDBuilder')
 
-project = Webcon.HL2Project(builder, 'webcon.ext')
+binary = builder.compiler.Library('webcon.ext')
+Webcon.ConfigureForExtension(builder, binary.compiler)
 
-project.sources += [
+binary.sources += [
   'extension.cpp',
   'sdk/smsdk_ext.cpp',
   'CDetour/detours.cpp',
   'asm/asm.c',
 ]
 
-for sdk_name in Webcon.sdks:
-  sdk = Webcon.sdks[sdk_name]
-
-  binary = Webcon.HL2Config(project, 'webcon.ext.' + sdk.ext, sdk)
-
-  binary.compiler.includes += [
-    os.path.join(builder.sourcePath, 'libmicrohttpd', 'include'),
-  ]
+binary.compiler.includes += [
+  os.path.join(builder.sourcePath, 'valve'),
+  os.path.join(builder.sourcePath, 'libmicrohttpd', 'include'),
+]
   
-  binary.compiler.defines += ['SOURCEMOD_BUILD']
+binary.compiler.defines += ['SOURCEMOD_BUILD']
 
-  binary.compiler.postlink += [libmicrohttpd.binary]
+binary.compiler.postlink += [libmicrohttpd.binary]
   
-  if builder.target_platform == 'windows':
-    binary.compiler.linkflags += ['ws2_32.lib']
+if builder.target_platform == 'windows':
+  binary.compiler.linkflags += ['ws2_32.lib']
 
-Webcon.extensions += builder.Add(project)
+Webcon.extensions += [builder.Add(binary)]

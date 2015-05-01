@@ -56,7 +56,7 @@
  * @brief Sets whether or not this plugin required Metamod.
  * NOTE: Uncomment to enable, comment to disable.
  */
-#define SMEXT_CONF_METAMOD		
+//#define SMEXT_CONF_METAMOD		
 
 /** Enable interfaces you want to use here by uncommenting lines */
 //#define SMEXT_ENABLE_FORWARDSYS
@@ -77,5 +77,6 @@
 //#define SMEXT_ENABLE_USERMSGS
 //#define SMEXT_ENABLE_TRANSLATOR
 //#define SMEXT_ENABLE_NINVOKE
+#define SMEXT_ENABLE_ROOTCONSOLEMENU
 
 #endif // _INCLUDE_SOURCEMOD_EXTENSION_CONFIG_H_

@@ -13,7 +13,7 @@
 #define IA32_MOV_REG_IMM		0xB8	// encoding is +r <imm32>
 #endif
 
-extern void Msg( const char *, ... );
+//extern void Msg( const char *, ... );
 
 /**
 * Checks if a call to a fpic thunk has just been written into dest.
@@ -64,7 +64,7 @@ void check_thunks(unsigned char *dest, unsigned char *pc)
 			}
 		default:
 			{
-				Msg("Unknown thunk: %c\n", *(calladdr+1));
+				//Msg("Unknown thunk: %c\n", *(calladdr+1));
 				break;
 			}
 		}

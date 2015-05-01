@@ -4,6 +4,7 @@ import os, platform
 builder.SetBuildFolder('libmicrohttpd')
 
 binary = builder.compiler.StaticLibrary('microhttpd')
+
 binary.compiler.includes += [
   os.path.join(builder.sourcePath, 'libmicrohttpd', 'microhttpd'),
   os.path.join(builder.sourcePath, 'libmicrohttpd', 'include')

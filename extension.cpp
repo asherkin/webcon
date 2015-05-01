@@ -1,9 +1,5 @@
 #include "extension.h"
 
-// tier1 supremecy
-#include <netadr.h>
-#include <utlvector.h>
-
 #include "CDetour/detours.h"
 
 #include "microhttpd.h"
@@ -16,6 +12,10 @@
 #define closesocket close
 #define ioctlsocket ioctl
 #endif
+
+// tier1 supremecy
+#include "utlvector.h"
+#include "netadr.h"
 
 Webcon g_Webcon;
 SMEXT_LINK(&g_Webcon);
@@ -80,7 +80,7 @@ void CSocketCreator::ProcessAccept()
 		return;
 	}
 
-	META_CONPRINTF("(%d) New listen socket accepted.\n", socket);
+	rootconsole->ConsolePrint("(%d) New listen socket accepted.\n", socket);
 
 	int opt = 1;
 	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt)); 
@@ -90,7 +90,7 @@ void CSocketCreator::ProcessAccept()
 
 	opt = 1;
 	if (ioctlsocket(socket, FIONBIO, (unsigned long *)&opt) == -1) {
-		META_CONPRINTF("(%d) Failed to set socket options.\n", socket);
+		rootconsole->ConsolePrint("(%d) Failed to set socket options.\n", socket);
 		closesocket(socket);
 		return;
 	}
@@ -99,7 +99,7 @@ void CSocketCreator::ProcessAccept()
 	address.SetFromSockadr(&socketAddress);
 
 	if (listener && !listener->ShouldAcceptSocket(socket, address)) {
-		META_CONPRINTF("(%d) Listener rejected connection.\n", socket);
+		rootconsole->ConsolePrint("(%d) Listener rejected connection.\n", socket);
 		closesocket(socket);
 		return;
 	}
@@ -150,18 +150,18 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 					continue;
 				}
 
-				META_CONPRINTF("(%d) recv error: %d\n", WSAGetLastError());
+				rootconsole->ConsolePrint("(%d) recv error: %d\n", WSAGetLastError());
 #else
 				if (errno == EAGAIN || errno == EWOULDBLOCK) {
 					continue;
 				}
 
-				META_CONPRINTF("(%d) recv error: %d\n", errno);
+				rootconsole->ConsolePrint("(%d) recv error: %d\n", errno);
 #endif
 			}
 
 			closesocket(pendingSocket->socket);
-			META_CONPRINTF("(%d) Listen socket closed.\n", pendingSocket->socket);
+			rootconsole->ConsolePrint("(%d) Listen socket closed.\n", pendingSocket->socket);
 
 			pendingSockets.Remove(i);
 			continue;
@@ -174,7 +174,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			// About 15 seconds.
 			if (pendingSocket->timeout > 1000) {
 				closesocket(pendingSocket->socket);
-				META_CONPRINTF("(%d) Listen socket timed out.\n", pendingSocket->socket);
+				rootconsole->ConsolePrint("(%d) Listen socket timed out.\n", pendingSocket->socket);
 
 				pendingSockets.Remove(i);
 			}
@@ -182,11 +182,11 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			continue;
 		}
 
-		META_CONPRINTF("(%d) Packet Header:", pendingSocket->socket);
+		rootconsole->ConsolePrint("(%d) Packet Header:", pendingSocket->socket);
 		for (unsigned j = 0; j < sizeof(buffer); ++j) {
-			META_CONPRINTF(" %02X", buffer[j]);
+			rootconsole->ConsolePrint(" %02X", buffer[j]);
 		}
-		META_CONPRINTF("\n");
+		rootconsole->ConsolePrint("\n");
 
 		bool isHttp = ((buffer[0] >= 'A' && buffer[0] <= 'Z') || (buffer[0] >= 'a' && buffer[0] <= 'z')) &&
 		              ((buffer[1] >= 'A' && buffer[1] <= 'Z') || (buffer[1] >= 'a' && buffer[1] <= 'z')) &&
@@ -200,13 +200,13 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 
 		if (isHttp || isHttps) {
 			MHD_add_connection(httpDaemon, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
-			META_CONPRINTF("(%d) Gave %s socket to web server.\n", pendingSocket->socket, isHttps ? "HTTPS" : "HTTP");
+			rootconsole->ConsolePrint("(%d) Gave %s socket to web server.\n", pendingSocket->socket, isHttps ? "HTTPS" : "HTTP");
 		} else if (isRcon) {
 			creator->HandSocketToEngine(pendingSocket);
-			META_CONPRINTF("(%d) Gave RCON socket to engine.\n", pendingSocket->socket);
+			rootconsole->ConsolePrint("(%d) Gave RCON socket to engine.\n", pendingSocket->socket);
 		} else {
 			closesocket(pendingSocket->socket);
-			META_CONPRINTF("(%d) Unidentified protocol on socket.\n", pendingSocket->socket);
+			rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.\n", pendingSocket->socket);
 		}
 
 		pendingSockets.Remove(i);
@@ -235,7 +235,7 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 		}
 
 		if (strcmp(method, MHD_HTTP_METHOD_POST) == 0) {
-			META_CONPRINTF("SERVER QUIT (honest!)\n");
+			rootconsole->ConsolePrint("SERVER QUIT (honest!)\n");
 
 			return MHD_queue_response(connection, MHD_HTTP_FOUND, responseQuitRedirect);
 		}
@@ -243,7 +243,7 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 		return MHD_queue_response(connection, MHD_HTTP_OK, responseQuitPage);
 	}
 	
-	META_CONPRINTF("Unhandled HTTP %s Request: %s\n", method, url);
+	rootconsole->ConsolePrint("Unhandled HTTP %s Request: %s\n", method, url);
 
 	return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 }
