@@ -3,13 +3,15 @@ language: cpp
 addons:
   apt:
     packages:
-    - clang-3.5
+    - clang-3.6
     - g++-multilib
+    sources:
+    - llvm-toolchain-precise-3.6
 compiler:
   - clang
 before_script:
   - CHECKOUT_DIR=$PWD && cd .. && git clone https://github.com/alliedmodders/sourcemod && git clone https://github.com/alliedmodders/ambuild && cd ambuild && python setup.py install --user && cd $CHECKOUT_DIR
 script:
   - mkdir build && cd build
-  - CC=clang-3.5 CXX=clang++-3.5 python ../configure.py --enable-optimize
+  - CC=clang-3.6 CXX=clang++-3.6 python ../configure.py --enable-optimize
   - ~/.local/bin/ambuild
