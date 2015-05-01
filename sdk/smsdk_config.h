@@ -38,14 +38,14 @@
  */
 
 /* Basic information exposed publicly */
-#define SMEXT_CONF_NAME			"Webcon"
-#define SMEXT_CONF_DESCRIPTION	""
-#define SMEXT_CONF_VERSION		"0.1.0"
-#define SMEXT_CONF_AUTHOR		"Asher \"asherkin\" Baker"
-#define SMEXT_CONF_URL			"https://limetech.org/"
-#define SMEXT_CONF_LOGTAG		"WEBCON"
-#define SMEXT_CONF_LICENSE		"GPL"
-#define SMEXT_CONF_DATESTRING	__DATE__
+#define SMEXT_CONF_NAME        "Webcon"
+#define SMEXT_CONF_DESCRIPTION ""
+#define SMEXT_CONF_VERSION     ""
+#define SMEXT_CONF_AUTHOR      "Asher \"asherkin\" Baker"
+#define SMEXT_CONF_URL         "https://limetech.org/"
+#define SMEXT_CONF_LOGTAG      "WEBCON"
+#define SMEXT_CONF_LICENSE     "GPLv3"
+#define SMEXT_CONF_DATESTRING  __DATE__
 
 /** 
  * @brief Exposes plugin's main interface.
