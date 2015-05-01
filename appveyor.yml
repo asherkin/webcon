@@ -1,0 +1,16 @@
+version: '{build}'
+install:
+  - cd ..
+  - git clone --depth=50 --branch=1.7-dev https://github.com/alliedmodders/sourcemod
+  - git clone --depth=50 --branch=master https://github.com/alliedmodders/ambuild
+  - cd ambuild
+  - C:\python27\python.exe setup.py install
+  - cd %APPVEYOR_BUILD_FOLDER%
+build_script:
+  - '"%VS120COMNTOOLS%\vsvars32.bat"'
+  - mkdir build
+  - cd build
+  - C:\python27\python.exe ..\configure.py --enable-optimize
+  - C:\python27\Scripts\ambuild
+on_success:
+  - C:\python27\python.exe ..\upload.py
