@@ -12,3 +12,5 @@ script:
   - mkdir build && cd build
   - python ../configure.py --enable-optimize
   - ~/.local/bin/ambuild
+after_success:
+  - python ../upload.py
