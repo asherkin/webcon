@@ -22,7 +22,10 @@ SMEXT_LINK(&g_Webcon);
 
 IGameConfig *gameConfig;
 
+bool shouldHandleProcessAccept;
+
 CDetour *detourProcessAccept;
+CDetour *detourRunFrame;
 
 MHD_Daemon *httpDaemon;
 
@@ -51,6 +54,27 @@ struct ISocketCreatorListener
 	virtual void OnSocketAccepted(int socket, const netadr_t &address, void **data) = 0; 
 	virtual void OnSocketClosed(int socket, const netadr_t &address, void *data) = 0;
 };
+
+struct CRConServer: public ISocketCreatorListener
+{
+	static void *HandleFailedRconAuthFunction;
+	bool HandleFailedRconAuth(const netadr_t &address);
+} *rconServer;
+
+void *CRConServer::HandleFailedRconAuthFunction = NULL;
+
+bool CRConServer::HandleFailedRconAuth(const netadr_t &address)
+{
+	if (!CRConServer::HandleFailedRconAuthFunction) {
+		return false;
+	}
+
+#ifdef _WIN32
+	return ((bool (__fastcall *)(CRConServer *, void *, const netadr_t &))CRConServer::HandleFailedRconAuthFunction)(this, NULL, address);
+#else
+	return ((bool (*)(CRConServer *, const netadr_t &))CRConServer::HandleFailedRconAuthFunction)(this, address);
+#endif
+}
 
 struct CSocketCreator 
 {
@@ -126,8 +150,9 @@ void CSocketCreator::HandSocketToEngine(PendingSocket *pendingSocket)
 
 DETOUR_DECL_MEMBER0(ProcessAccept, void)
 {
-	// We DO NOT want to call the engine's implementation.
-	//DETOUR_MEMBER_CALL(ProcessAccept)();
+	if (!shouldHandleProcessAccept) {
+		return DETOUR_MEMBER_CALL(ProcessAccept)();
+	}
 
 	CSocketCreator *creator = (CSocketCreator *)this;
 
@@ -173,6 +198,10 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 
 			// About 15 seconds.
 			if (pendingSocket->timeout > 1000) {
+				if (rconServer) {
+					rconServer->HandleFailedRconAuth(pendingSocket->address);
+				}
+
 				closesocket(pendingSocket->socket);
 				rootconsole->ConsolePrint("(%d) Listen socket timed out.\n", pendingSocket->socket);
 
@@ -205,6 +234,10 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			creator->HandSocketToEngine(pendingSocket);
 			rootconsole->ConsolePrint("(%d) Gave RCON socket to engine.\n", pendingSocket->socket);
 		} else {
+			if (rconServer) {
+				rconServer->HandleFailedRconAuth(pendingSocket->address);
+			}
+
 			closesocket(pendingSocket->socket);
 			rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.\n", pendingSocket->socket);
 		}
@@ -214,6 +247,15 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 
 	// Now everyone has their sockets, do HTTP work.
 	MHD_run(httpDaemon);
+}
+
+DETOUR_DECL_MEMBER0(RunFrame, void)
+{
+	rconServer = (CRConServer *)this;
+
+	shouldHandleProcessAccept = true;
+	DETOUR_MEMBER_CALL(RunFrame)();
+	shouldHandleProcessAccept = false;
 }
 
 int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
@@ -262,6 +304,18 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		return false;
 	}
 
+	detourRunFrame = DETOUR_CREATE_MEMBER(RunFrame, "RunFrame");
+	if (!detourRunFrame) {
+		shouldHandleProcessAccept = true;
+		g_pSM->LogError(myself, "WARNING: Error setting up RunFrame detour, all TCP sockets will be hooked.");
+	}
+
+	if (!gameConfig->GetMemSig("HandleFailedRconAuth", &CRConServer::HandleFailedRconAuthFunction)) {
+		g_pSM->LogError(myself, "WARNING: HandleFailedRconAuth not found in gamedata, bad clients will not be banned.");
+	} else if (!CRConServer::HandleFailedRconAuthFunction) {
+		g_pSM->LogError(myself, "WARNING: Scan for HandleFailedRconAuth failed, bad clients will not be banned.");
+	}
+
 	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_END);
 	if (!httpDaemon) {
 		strncpy(error, "Failed to start HTTP server", maxlength);
@@ -285,6 +339,7 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	MHD_add_response_header(responseQuitRedirect, "Location", "/quit");
 
 	detourProcessAccept->EnableDetour();
+	detourRunFrame->EnableDetour();
 
 	return true;
 }
@@ -292,6 +347,7 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 void Webcon::SDK_OnUnload()
 {
 	detourProcessAccept->DisableDetour();
+	detourRunFrame->DisableDetour();
 
 	MHD_destroy_response(responseUnauthorized);
 	MHD_destroy_response(responseNotFound);
