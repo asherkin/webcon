@@ -11,6 +11,7 @@
 #include <sys/ioctl.h>
 #define closesocket close
 #define ioctlsocket ioctl
+#define WSAGetLastError() errno
 #endif
 
 // tier1 supremecy
@@ -148,6 +149,14 @@ void CSocketCreator::HandSocketToEngine(PendingSocket *pendingSocket)
 	}
 }
 
+bool SocketWouldBlock() {
+#if _WIN32
+	return (WSAGetLastError() == WSAEWOULDBLOCK);
+#else
+	return (errno == EAGAIN || errno == EWOULDBLOCK);
+#endif
+}
+
 DETOUR_DECL_MEMBER0(ProcessAccept, void)
 {
 	if (!shouldHandleProcessAccept) {
@@ -168,32 +177,24 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 
 		ssize_t ret = recv(pendingSocket->socket, (char *)buffer, sizeof(buffer), MSG_PEEK);
 
-		if (ret <= 0) {
-			if (ret == -1) {
-#if _WIN32
-				if (WSAGetLastError() == WSAEWOULDBLOCK) {
-					continue;
-				}
-
-				rootconsole->ConsolePrint("(%d) recv error: %d", WSAGetLastError());
-#else
-				if (errno == EAGAIN || errno == EWOULDBLOCK) {
-					continue;
-				}
-
-				rootconsole->ConsolePrint("(%d) recv error: %d", errno);
-#endif
-			}
-
-			closesocket(pendingSocket->socket);
+		if (ret == 0) {
 			rootconsole->ConsolePrint("(%d) Listen socket closed.", pendingSocket->socket);
+			closesocket(pendingSocket->socket);
+
+			pendingSockets.Remove(i);
+			continue;
+		}
+
+		if (ret == -1 && !SocketWouldBlock()) {
+			rootconsole->ConsolePrint("(%d) recv error: %d", WSAGetLastError());
+			closesocket(pendingSocket->socket);
 
 			pendingSockets.Remove(i);
 			continue;
 		}
 
 		// We need at least n bytes to identify packets.
-		if ((size_t)ret < sizeof(buffer)) {
+		if (ret < (ssize_t)sizeof(buffer)) {
 			pendingSocket->timeout++;
 
 			// About 15 seconds.
@@ -202,8 +203,8 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 					rconServer->HandleFailedRconAuth(pendingSocket->address);
 				}
 
-				closesocket(pendingSocket->socket);
 				rootconsole->ConsolePrint("(%d) Listen socket timed out.", pendingSocket->socket);
+				closesocket(pendingSocket->socket);
 
 				pendingSockets.Remove(i);
 			}
@@ -240,8 +241,8 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 				rconServer->HandleFailedRconAuth(pendingSocket->address);
 			}
 
-			closesocket(pendingSocket->socket);
 			rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.", pendingSocket->socket);
+			closesocket(pendingSocket->socket);
 		}
 
 		pendingSockets.Remove(i);
