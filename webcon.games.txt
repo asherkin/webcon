@@ -4,11 +4,84 @@
 	{
 		"Signatures"
 		{
+			/*
+			 * String: "Socket ProcessAccept Error: %s\n"
+			 */
 			"ProcessAccept"
 			{
 				"library" "engine"
 				"linux"   "@_ZN14CSocketCreator13ProcessAcceptEv"
+			}
+
+			/*
+			 * If this signature exists, it is used to scope the ProcessAccept detour to only the RCon server.
+			 *
+			 * String: "RCON Cmd: recv error (%s)\n"
+			 * You're looking for the one that doesn't also contain "Lost RCON connection, please retry command (%s)\n"
+			 */
+			"RunFrame"
+			{
+				"library" "engine"
+				"linux"   "@_ZN11CRConServer8RunFrameEv"
+			}
+
+			/*
+             * Optional, used to ban clients sending invalid data.
+             *
+             * String: "Banning %s for rcon hacking attempts\n"
+			 */
+			"HandleFailedRconAuth"
+			{
+				"library" "engine"
+				"linux"   "@_ZN11CRConServer20HandleFailedRconAuthERK8netadr_s"
+			}
+		}
+	}
+
+	"tf"
+	{
+		"Signatures"
+		{
+			"ProcessAccept"
+			{
+				"library" "engine"
 				"windows" "\x55\x8B\xEC\x83\xEC\x24\x53\x57\x8D\x45\xF8\xC7\x45\xF8\x10\x00\x00\x00\x50"
+			}
+
+			"RunFrame"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\xB8\x68\x10\x00\x00\xE8\x2A\x2A\x2A\x2A\x53\x56\x8B\xF1\x57"
+			}
+
+			"HandleFailedRconAuth"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x18\xA1\x2A\x2A\x2A\x2A\x8B\x15\x2A\x2A\x2A\x2A\x53\x56\x57"
+			}
+		}
+	}
+
+	"csgo"
+	{
+		"Signatures"
+		{
+			"ProcessAccept"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x24\x53\x56\x57\x8D\x45\xF8\xC7\x45\xF8\x10\x00\x00\x00\x50"
+			}
+
+			"RunFrame"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\xB8\x6C\x10\x00\x00\xE8\x2A\x2A\x2A\x2A\x58\x8B\xD9"
+			}
+
+			"HandleFailedRconAuth"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x18\x8B\x15\x2A\x2A\x2A\x2A\x89\x4D\xFC\x53\x56"
 			}
 		}
 	}
