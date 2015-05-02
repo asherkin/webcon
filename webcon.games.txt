@@ -62,6 +62,30 @@
 		}
 	}
 
+	"css"
+	{
+		"Signatures"
+		{
+			"ProcessAccept"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x24\x53\x57\x8D\x45\xF8\xC7\x45\xF8\x10\x00\x00\x00\x50"
+			}
+
+			"RunFrame"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\xB8\x68\x10\x00\x00\xE8\x2A\x2A\x2A\x2A\x53\x56\x8B\xF1\x57"
+			}
+
+			"HandleFailedRconAuth"
+			{
+				"library" "engine"
+				"windows" "\x55\x8B\xEC\x83\xEC\x18\x53\x8B\xD9\x56\x57\x33\xF6\x89\x5D\xF8"
+			}
+		}
+	}
+
 	"csgo"
 	{
 		"Signatures"
