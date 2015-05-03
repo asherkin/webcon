@@ -9,6 +9,7 @@
 #include <netinet/tcp.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <arpa/inet.h>
 #define closesocket close
 #define ioctlsocket ioctl
 #define WSAGetLastError() errno
@@ -37,6 +38,9 @@ MHD_Response *responseIndexPage;
 
 MHD_Response *responseQuitPage;
 MHD_Response *responseQuitRedirect;
+
+MHD_Response *responseUploadPage;
+MHD_Response *responseUploadRedirect;
 
 struct PendingSocket
 {
@@ -287,10 +291,34 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 
 		return MHD_queue_response(connection, MHD_HTTP_OK, responseQuitPage);
 	}
+
+	if (strcmp(url, "/upload") == 0) {
+		if (strcmp(method, MHD_HTTP_METHOD_POST) == 0) {
+			rootconsole->ConsolePrint("Data Uploaded (%d)", *upload_data_size);
+
+			return MHD_queue_response(connection, MHD_HTTP_FOUND, responseUploadRedirect);
+		}
+
+		return MHD_queue_response(connection, MHD_HTTP_OK, responseUploadPage);
+	}
 	
 	rootconsole->ConsolePrint("Unhandled HTTP %s Request: %s", method, url);
 
 	return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
+}
+
+void *LogRequestCallback(void *cls, const char *uri, struct MHD_Connection *con)
+{
+	char *ip = inet_ntoa(((sockaddr_in *const)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
+	smutils->LogMessage(myself, "Request from %s: %s", ip, uri);
+	return NULL;
+}
+
+void LogErrorCallback(void *cls, const char *fm, va_list ap)
+{
+	char buffer[2048];
+	smutils->FormatArgs(buffer, sizeof(buffer), fm, ap);
+	smutils->LogError(myself, "%s", buffer);
 }
 
 bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
@@ -310,28 +338,28 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	detourRunFrame = DETOUR_CREATE_MEMBER(RunFrame, "RunFrame");
 	if (!detourRunFrame) {
 		shouldHandleProcessAccept = true;
-		g_pSM->LogError(myself, "WARNING: Error setting up RunFrame detour, all TCP sockets will be hooked.");
+		smutils->LogError(myself, "WARNING: Error setting up RunFrame detour, all TCP sockets will be hooked.");
 	}
 
 	if (!gameConfig->GetMemSig("HandleFailedRconAuth", &CRConServer::HandleFailedRconAuthFunction)) {
-		g_pSM->LogError(myself, "WARNING: HandleFailedRconAuth not found in gamedata, bad clients will not be banned.");
+		smutils->LogError(myself, "WARNING: HandleFailedRconAuth not found in gamedata, bad clients will not be banned.");
 	} else if (!CRConServer::HandleFailedRconAuthFunction) {
-		g_pSM->LogError(myself, "WARNING: Scan for HandleFailedRconAuth failed, bad clients will not be banned.");
+		smutils->LogError(myself, "WARNING: Scan for HandleFailedRconAuth failed, bad clients will not be banned.");
 	}
 
-	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_END);
+	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_URI_LOG_CALLBACK, LogRequestCallback, NULL, MHD_OPTION_EXTERNAL_LOGGER, LogErrorCallback, NULL, MHD_OPTION_END);
 	if (!httpDaemon) {
 		strncpy(error, "Failed to start HTTP server", maxlength);
 		return false;
 	}
 
-	const char *contentUnauthorized = "<!DOCTYPE html>\n<html><body><h1>401 Unauthorized!</h1></body></html>";
+	const char *contentUnauthorized = "<!DOCTYPE html>\n<html><body><h1>401 Unauthorized</h1></body></html>";
 	responseUnauthorized = MHD_create_response_from_buffer(strlen(contentUnauthorized), (void *)contentUnauthorized, MHD_RESPMEM_PERSISTENT);
 
 	const char *contentNotFound = "<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
 
-	const char *contentIndexPage = "<!DOCTYPE html>\n<html><body><h1>Hello, browser!</h1><a href=\"/quit\">Quit</a></body></html>";
+	const char *contentIndexPage = "<!DOCTYPE html>\n<html><body><h1>Hello, browser!</h1><a href=\"/upload\">Upload</a><br><a href=\"/quit\">Quit</a></body></html>";
 	responseIndexPage = MHD_create_response_from_buffer(strlen(contentIndexPage), (void *)contentIndexPage, MHD_RESPMEM_PERSISTENT);
 
 	const char *contentQuitPage = "<!DOCTYPE html>\n<html><body><h1>Quit</h1><form method=\"post\"><button type=\"submit\">Quit</button></form></body></html>";
@@ -340,6 +368,12 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	const char *contentRedirect = "<!DOCTYPE html>\n<html><body><h1>Redirecting...</h1></body></html>";
 	responseQuitRedirect = MHD_create_response_from_buffer(strlen(contentRedirect), (void *)contentRedirect, MHD_RESPMEM_PERSISTENT);
 	MHD_add_response_header(responseQuitRedirect, "Location", "/quit");
+
+	const char *contentUploadPage = "<!DOCTYPE html>\n<html><body><h1>Upload</h1><form method=\"post\"><input type=\"file\" name=\"file\"><br><textarea name=\"comment\"></textarea><br><button type=\"submit\">Upload</button></form></body></html>";
+	responseUploadPage = MHD_create_response_from_buffer(strlen(contentUploadPage), (void *)contentUploadPage, MHD_RESPMEM_PERSISTENT);
+
+	responseUploadRedirect = MHD_create_response_from_buffer(strlen(contentRedirect), (void *)contentRedirect, MHD_RESPMEM_PERSISTENT);
+	MHD_add_response_header(responseUploadRedirect, "Location", "/upload");
 
 	detourProcessAccept->EnableDetour();
 	detourRunFrame->EnableDetour();
