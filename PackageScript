@@ -6,6 +6,8 @@ builder.SetBuildFolder('package')
 folder_list = [
   'addons/sourcemod/extensions',
   'addons/sourcemod/gamedata',
+  'addons/sourcemod/scripting',
+  'addons/sourcemod/scripting/include',
 ]
 
 # Create the distribution folder hierarchy.
@@ -27,3 +29,5 @@ def CopyFiles(src, dest, files):
     builder.AddCopy(source_path, dest_entry)
 
 CopyFiles('', 'addons/sourcemod/gamedata', ['webcon.games.txt'])
+CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
+CopyFiles('', 'addons/sourcemod/scripting/include', ['webcon.inc'])

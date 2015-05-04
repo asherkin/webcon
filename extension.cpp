@@ -30,17 +30,9 @@ CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
 
 MHD_Daemon *httpDaemon;
-
-MHD_Response *responseUnauthorized;
 MHD_Response *responseNotFound;
 
-MHD_Response *responseIndexPage;
-
-MHD_Response *responseQuitPage;
-MHD_Response *responseQuitRedirect;
-
-MHD_Response *responseUploadPage;
-MHD_Response *responseUploadRedirect;
+IForward *forwardRequest;
 
 struct PendingSocket
 {
@@ -267,42 +259,10 @@ DETOUR_DECL_MEMBER0(RunFrame, void)
 
 int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	if (strcmp(url, "/") == 0) {
-		return MHD_queue_response(connection, MHD_HTTP_OK, responseIndexPage);
-	}
-
-	if (strcmp(url, "/quit") == 0) {
-		// Yes, everyone knows this is awful, it's test code, shh.
-		char *password = NULL;
-		char *username = MHD_basic_auth_get_username_password(connection, &password);
-		bool authorized = (username && password && strcmp(username, "srcds") == 0 && strcmp(password, "srcds") == 0);
-		free(username);
-		free(password);
-
-		if (!authorized) {
-			return MHD_queue_basic_auth_fail_response(connection, "SRCDS", responseUnauthorized);
-		}
-
-		if (strcmp(method, MHD_HTTP_METHOD_POST) == 0) {
-			rootconsole->ConsolePrint("SERVER QUIT (honest!)");
-
-			return MHD_queue_response(connection, MHD_HTTP_FOUND, responseQuitRedirect);
-		}
-
-		return MHD_queue_response(connection, MHD_HTTP_OK, responseQuitPage);
-	}
-
-	if (strcmp(url, "/upload") == 0) {
-		if (strcmp(method, MHD_HTTP_METHOD_POST) == 0) {
-			rootconsole->ConsolePrint("Data Uploaded (%d)", *upload_data_size);
-
-			return MHD_queue_response(connection, MHD_HTTP_FOUND, responseUploadRedirect);
-		}
-
-		return MHD_queue_response(connection, MHD_HTTP_OK, responseUploadPage);
-	}
-	
-	rootconsole->ConsolePrint("Unhandled HTTP %s Request: %s", method, url);
+	forwardRequest->PushCell(0);
+	forwardRequest->PushString(url);
+	forwardRequest->PushString(method);
+	forwardRequest->Execute(NULL);
 
 	return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 }
@@ -353,27 +313,10 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		return false;
 	}
 
-	const char *contentUnauthorized = "<!DOCTYPE html>\n<html><body><h1>401 Unauthorized</h1></body></html>";
-	responseUnauthorized = MHD_create_response_from_buffer(strlen(contentUnauthorized), (void *)contentUnauthorized, MHD_RESPMEM_PERSISTENT);
-
 	const char *contentNotFound = "<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
 
-	const char *contentIndexPage = "<!DOCTYPE html>\n<html><body><h1>Hello, browser!</h1><a href=\"/upload\">Upload</a><br><a href=\"/quit\">Quit</a></body></html>";
-	responseIndexPage = MHD_create_response_from_buffer(strlen(contentIndexPage), (void *)contentIndexPage, MHD_RESPMEM_PERSISTENT);
-
-	const char *contentQuitPage = "<!DOCTYPE html>\n<html><body><h1>Quit</h1><form method=\"post\"><button type=\"submit\">Quit</button></form></body></html>";
-	responseQuitPage = MHD_create_response_from_buffer(strlen(contentQuitPage), (void *)contentQuitPage, MHD_RESPMEM_PERSISTENT);
-
-	const char *contentRedirect = "<!DOCTYPE html>\n<html><body><h1>Redirecting...</h1></body></html>";
-	responseQuitRedirect = MHD_create_response_from_buffer(strlen(contentRedirect), (void *)contentRedirect, MHD_RESPMEM_PERSISTENT);
-	MHD_add_response_header(responseQuitRedirect, "Location", "/quit");
-
-	const char *contentUploadPage = "<!DOCTYPE html>\n<html><body><h1>Upload</h1><form method=\"post\"><input type=\"file\" name=\"file\"><br><textarea name=\"comment\"></textarea><br><button type=\"submit\">Upload</button></form></body></html>";
-	responseUploadPage = MHD_create_response_from_buffer(strlen(contentUploadPage), (void *)contentUploadPage, MHD_RESPMEM_PERSISTENT);
-
-	responseUploadRedirect = MHD_create_response_from_buffer(strlen(contentRedirect), (void *)contentRedirect, MHD_RESPMEM_PERSISTENT);
-	MHD_add_response_header(responseUploadRedirect, "Location", "/upload");
+	forwardRequest = forwards->CreateForward("OnWebRequest", ET_Hook, 3, NULL, Param_Cell, Param_String, Param_String);
 
 	detourProcessAccept->EnableDetour();
 	detourRunFrame->EnableDetour();
@@ -383,14 +326,12 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Webcon::SDK_OnUnload()
 {
-	detourProcessAccept->DisableDetour();
 	detourRunFrame->DisableDetour();
+	detourProcessAccept->DisableDetour();
 
-	MHD_destroy_response(responseUnauthorized);
+	forwards->ReleaseForward(forwardRequest);
+
 	MHD_destroy_response(responseNotFound);
-	MHD_destroy_response(responseIndexPage);
-	MHD_destroy_response(responseQuitPage);
-	MHD_destroy_response(responseQuitRedirect);
 
 	MHD_stop_daemon(httpDaemon);
 
