@@ -322,14 +322,20 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	forwardRequest = forwards->CreateForward("OnWebRequest", ET_Hook, 3, NULL, Param_Cell, Param_String, Param_String);
 
 	detourProcessAccept->EnableDetour();
-	detourRunFrame->EnableDetour();
+	
+	if (detourRunFrame) {
+		detourRunFrame->EnableDetour();
+	}
 
 	return true;
 }
 
 void Webcon::SDK_OnUnload()
 {
-	detourRunFrame->DisableDetour();
+	if (detourRunFrame) {
+		detourRunFrame->DisableDetour();
+	}
+	
 	detourProcessAccept->DisableDetour();
 
 	forwards->ReleaseForward(forwardRequest);
