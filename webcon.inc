@@ -3,13 +3,33 @@
 #endif
 #define _webcon_included
 
+//const char WebMethod_Connect[] = "CONNECT";
+//const char WebMethod_Delete[] = "DELETE";
+//const char WebMethod_Get[] = "GET";
+//const char WebMethod_Head[] = "HEAD";
+//const char WebMethod_Options[] = "OPTIONS";
+//const char WebMethod_Post[] = "POST";
+//const char WebMethod_Put[] = "PUT";
+//const char WebMethod_Patch[] = "PATCH";
+//const char WebMethod_Trace[] = "TRACE";
+
+#define WebMethod_Connect "CONNECT"
+#define WebMethod_Delete "DELETE"
+#define WebMethod_Get "GET"
+#define WebMethod_Head "HEAD"
+#define WebMethod_Options "OPTIONS"
+#define WebMethod_Post "POST"
+#define WebMethod_Put "PUT"
+#define WebMethod_Patch "PATCH"
+#define WebMethod_Trace "TRACE"
+
 enum WebStatus
 {
 	WebStatus_Continue = 100,
 	WebStatus_SwitchingProtocols = 101,
 	WebStatus_Processing = 102,
 
-	WebStatus_Ok = 200,
+	WebStatus_OK = 200,
 	WebStatus_Created = 201,
 	WebStatus_Accepted = 202,
 	WebStatus_NonAuthoritativeInformation = 203,
@@ -66,6 +86,58 @@ enum WebStatus
 	WebStatus_BandwidthLimitExceeded = 509,
 	WebStatus_NotExtended = 510,
 }
+
+#define WebHeader_Accept "Accept"
+#define WebHeader_AcceptCharset "Accept-Charset"
+#define WebHeader_AcceptEncoding "Accept-Encoding"
+#define WebHeader_AcceptLanguage "Accept-Language"
+#define WebHeader_AcceptRanges "Accept-Ranges"
+#define WebHeader_Age "Age"
+#define WebHeader_Allow "Allow"
+#define WebHeader_Authorization "Authorization"
+#define WebHeader_CacheControl "Cache-Control"
+#define WebHeader_Connection "Connection"
+#define WebHeader_ContentEncoding "Content-Encoding"
+#define WebHeader_ContentLanguage "Content-Language"
+#define WebHeader_ContentLength "Content-Length"
+#define WebHeader_ContentLocation "Content-Location"
+#define WebHeader_ContentMD5  "Content-MD5"
+#define WebHeader_ContentRange "Content-Range"
+#define WebHeader_ContentType "Content-Type"
+#define WebHeader_Cookie "Cookie"
+#define WebHeader_Date "Date"
+#define WebHeader_ETag "ETag"
+#define WebHeader_Expect "Expect"
+#define WebHeader_Expires "Expires"
+#define WebHeader_From "From"
+#define WebHeader_Host "Host"
+#define WebHeader_IfMatch "If-Match"
+#define WebHeader_IfModifiedSince "If-Modified-Since"
+#define WebHeader_IfNoneMatch "If-None-Match"
+#define WebHeader_IfRange "If-Range"
+#define WebHeader_IfUnmodifiedSince "If-Unmodified-Since"
+#define WebHeader_LastModified "Last-Modified"
+#define WebHeader_Location "Location"
+#define WebHeader_MaxForwards "Max-Forwards"
+#define WebHeader_Pragma "Pragma"
+#define WebHeader_ProxyAuthenticate "Proxy-Authenticate"
+#define WebHeader_ProxyAuthorization "Proxy-Authorization"
+#define WebHeader_Range "Range"
+#define WebHeader_Referer "Referer"
+#define WebHeader_RetryAfter "Retry-After"
+#define WebHeader_Server "Server"
+#define WebHeader_SetCookie "Set-Cookie"
+#define WebHeader_SetCookie2 "Set-Cookie2"
+#define WebHeader_TE "TE"
+#define WebHeader_Trailer "Trailer"
+#define WebHeader_TransferEncoding "Transfer-Encoding"
+#define WebHeader_Upgrade "Upgrade"
+#define WebHeader_UserAgent "User-Agent"
+#define WebHeader_Vary "Vary"
+#define WebHeader_Via "Via"
+#define WebHeader_Warning "Warning"
+#define WebHeader_WWWAuthenticate "WWW-Authenticate"
+#define WebHeader_AccessControlAllowOrigin "Access-Control-Allow-Origin"
 
 methodmap WebResponse < Handle
 {

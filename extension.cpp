@@ -264,7 +264,10 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 	forwardRequest->PushString(method);
 	forwardRequest->Execute(NULL);
 
-	return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
+	// Blindly queue this for now.
+	MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
+
+	return MHD_YES;
 }
 
 void *LogRequestCallback(void *cls, const char *uri, struct MHD_Connection *con)
