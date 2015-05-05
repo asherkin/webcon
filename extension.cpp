@@ -56,7 +56,9 @@ struct CRConServer: public ISocketCreatorListener
 {
 	static void *HandleFailedRconAuthFunction;
 	bool HandleFailedRconAuth(const netadr_t &address);
-} *rconServer;
+};
+
+CRConServer *rconServer;
 
 void *CRConServer::HandleFailedRconAuthFunction = NULL;
 
@@ -257,14 +259,129 @@ DETOUR_DECL_MEMBER0(RunFrame, void)
 	shouldHandleProcessAccept = false;
 }
 
+HandleType_t handleTypeResponse;
+
+struct ResponseTypeHandler: public IHandleTypeDispatch
+{
+	void OnHandleDestroy(HandleType_t type, void *object);
+};
+
+ResponseTypeHandler handlerResponseType;
+
+void ResponseTypeHandler::OnHandleDestroy(HandleType_t type, void *object)
+{
+	MHD_destroy_response((MHD_Response *)object);
+}
+
+HandleType_t handleTypeConnection;
+
+struct ConnectionTypeHandler: public IHandleTypeDispatch
+{
+	void OnHandleDestroy(HandleType_t type, void *object);
+};
+
+ConnectionTypeHandler handlerConnectionType;
+
+void ConnectionTypeHandler::OnHandleDestroy(HandleType_t type, void *object)
+{
+	// Do nothing.
+}
+
+cell_t WebResponse_WebResponse(IPluginContext *context, const cell_t *params)
+{
+	char *content;
+	context->LocalToString(params[1], &content);
+
+	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
+
+	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
+}
+
+cell_t WebResponse_AddHeader(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	MHD_Response *response;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeResponse, &security, (void **)&response);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid response handle %x (error %d)", params[1], error);
+	}
+
+	char *header;
+	context->LocalToString(params[2], &header);
+
+	char *content;
+	context->LocalToString(params[3], &content);
+
+	return MHD_add_response_header(response, header, content);
+}
+
+cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params)
+{
+	HandleError error;
+
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	MHD_Connection *connection;
+	error = handlesys->ReadHandle(params[1], handleTypeConnection, &security, (void **)&connection);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid connection handle %x (error %d)", params[1], error);
+	}
+
+	MHD_Response *response;
+	error = handlesys->ReadHandle(params[3], handleTypeResponse, &security, (void **)&response);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid response handle %x (error %d)", params[3], error);
+	}
+
+	return MHD_queue_response(connection, params[2], response);;
+}
+
+cell_t WebConnection_GetClientAddress(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	MHD_Connection *connection;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeConnection, &security, (void **)&connection);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid connection handle %x (error %d)", params[1], error);
+	}
+
+	sockaddr_in *address = (sockaddr_in *)MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr;
+	char *ip = inet_ntoa(address->sin_addr);
+	context->StringToLocal(params[2], params[3], ip);
+
+	return 1;
+}
+
+sp_nativeinfo_t natives[] = {
+	{"WebResponse.WebResponse", WebResponse_WebResponse},
+	{"WebResponse.AddHeader", WebResponse_AddHeader},
+	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
+	{"WebConnection.GetClientAddress", WebConnection_GetClientAddress},
+	{NULL, NULL}
+};
+
 int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	forwardRequest->PushCell((cell_t)connection); // TODO: Wrap this in a Handle.
+	Handle_t handle = (Handle_t)(MHD_get_connection_info(connection, MHD_CONNECTION_INFO_SOCKET_CONTEXT)->socket_context);
+
+	if (handle == BAD_HANDLE) {
+		return MHD_NO;
+	}
+
+	forwardRequest->PushCell(handle);
 	forwardRequest->PushString(url);
 	forwardRequest->PushString(method);
 	forwardRequest->Execute(NULL);
 
-	// Blindly queue this for now.
+	// Blindly queue this for now, it'll fail if any response was queued in the forward.
 	MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 
 	return MHD_YES;
@@ -272,7 +389,7 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 
 void *LogRequestCallback(void *cls, const char *uri, struct MHD_Connection *con)
 {
-	char *ip = inet_ntoa(((sockaddr_in *const)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
+	char *ip = inet_ntoa(((sockaddr_in *)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
 	smutils->LogMessage(myself, "Request from %s: %s", ip, uri);
 	return NULL;
 }
@@ -284,30 +401,46 @@ void LogErrorCallback(void *cls, const char *fm, va_list ap)
 	smutils->LogError(myself, "%s", buffer);
 }
 
-cell_t WebResponse_WebResponse(IPluginContext *context, const cell_t *params)
+void NotifyConnectionCallback(void *cls, MHD_Connection *connection, void **socket_context, MHD_ConnectionNotificationCode toe)
 {
-	char *content;
-	context->LocalToString(params[1], &content);
+	Handle_t *handle = (Handle_t *)socket_context;
 
-	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
+	HandleError error;
 
-	return (cell_t)response; // TODO: Wrap this in a Handle.
+	HandleSecurity security;
+	security.pOwner = NULL;
+	security.pIdentity = myself->GetIdentity();
+
+	switch(toe) {
+		case MHD_CONNECTION_NOTIFY_STARTED:
+		{
+			*handle = handlesys->CreateHandle(handleTypeConnection, connection, NULL, myself->GetIdentity(), &error);
+
+			if (*handle == BAD_HANDLE) {
+				smutils->LogError(myself, "Error creating handle for connection. (%d)", error);
+			}
+
+			break;
+		}
+
+		case MHD_CONNECTION_NOTIFY_CLOSED:
+		{
+			if (*handle == BAD_HANDLE) {
+				break;
+			}
+
+			error = g_pHandleSys->FreeHandle(*handle, &security);
+
+			if (error != HandleError_None) {
+				smutils->LogError(myself, "Error freeing handle for connection. (%x, %d)", *handle, error);
+			}
+
+			*handle = BAD_HANDLE;
+
+			break;
+		}
+	}
 }
-
-cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params)
-{
-	// TODO: These need to be wrapped in Handles.
-	MHD_Connection *connection = (MHD_Connection *)params[1];
-	MHD_Response *response = (MHD_Response *)params[3];
-
-	return MHD_queue_response(connection, params[2], response);;
-}
-
-sp_nativeinfo_t natives[] = {
-	{"WebResponse.WebResponse", WebResponse_WebResponse},
-	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
-	{NULL, NULL}
-};
 
 bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
@@ -335,7 +468,7 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		smutils->LogError(myself, "WARNING: Scan for HandleFailedRconAuth failed, bad clients will not be banned.");
 	}
 
-	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_URI_LOG_CALLBACK, LogRequestCallback, NULL, MHD_OPTION_EXTERNAL_LOGGER, LogErrorCallback, NULL, MHD_OPTION_END);
+	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_URI_LOG_CALLBACK, LogRequestCallback, NULL, MHD_OPTION_EXTERNAL_LOGGER, LogErrorCallback, NULL, MHD_OPTION_NOTIFY_CONNECTION, NotifyConnectionCallback, NULL, MHD_OPTION_END);
 	if (!httpDaemon) {
 		strncpy(error, "Failed to start HTTP server", maxlength);
 		return false;
@@ -343,6 +476,15 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	const char *contentNotFound = "<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
+
+	handleTypeResponse = handlesys->CreateType("WebResponse", &handlerResponseType, 0, NULL, NULL, myself->GetIdentity(), NULL);
+
+	HandleAccess connectionAccessRules;
+	g_pHandleSys->InitAccessDefaults(NULL, &connectionAccessRules);
+
+	connectionAccessRules.access[HandleAccess_Delete] = HANDLE_RESTRICT_IDENTITY;
+
+	handleTypeConnection = handlesys->CreateType("WebConnection", &handlerConnectionType, 0, NULL, &connectionAccessRules, myself->GetIdentity(), NULL);
 
 	sharesys->AddNatives(myself, natives);
 
@@ -366,6 +508,10 @@ void Webcon::SDK_OnUnload()
 	detourProcessAccept->DisableDetour();
 
 	forwards->ReleaseForward(forwardRequest);
+
+	handlesys->RemoveType(handleTypeConnection, myself->GetIdentity());
+
+	handlesys->RemoveType(handleTypeResponse, myself->GetIdentity());
 
 	MHD_destroy_response(responseNotFound);
 

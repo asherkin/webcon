@@ -3,6 +3,8 @@
 #endif
 #define _webcon_included
 
+#define WEB_CLIENT_ADDRESS_LENGTH 46
+
 //const char WebMethod_Connect[] = "CONNECT";
 //const char WebMethod_Delete[] = "DELETE";
 //const char WebMethod_Get[] = "GET";
@@ -142,11 +144,13 @@ enum WebStatus
 methodmap WebResponse < Handle
 {
 	public native WebResponse(const char[] content);
+	public native bool AddHeader(const char[] header, const char[] content);
 };
 
 methodmap WebConnection < Handle
 {
 	public native bool QueueResponse(WebStatus status, WebResponse response);
+	public native bool GetClientAddress(char[] buffer, int length);
 };
 
 forward Action OnWebRequest(WebConnection connection, const char[] url, const char[] method);

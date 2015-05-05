@@ -4,10 +4,14 @@
 #include <webcon>
 
 WebResponse indexResponse;
+WebResponse googleResponse;
 
 public void OnPluginStart()
 {
 	indexResponse = new WebResponse("<!DOCTYPE html>\n<html><body><h1>Hello, World!</h1></body></html>");
+
+	googleResponse = new WebResponse("<!DOCTYPE html>\n<html><body>Redirecting...</body></html>");
+	googleResponse.AddHeader(WebHeader_Location, "https://google.com");
 }
 
 // This isn't very good, but hey, test code.
@@ -22,7 +26,10 @@ void EscapeHTML(char[] buffer, int length)
 
 public Action OnWebRequest(WebConnection connection, const char[] url, const char[] method)
 {
-	PrintToServer("(%s) %s", method, url);
+	char address[WEB_CLIENT_ADDRESS_LENGTH];
+	connection.GetClientAddress(address, sizeof(address));
+
+	PrintToServer("%s - %s - %s", address, method, url);
 
 	if (StrEqual(url, "/")) {
 		connection.QueueResponse(WebStatus_OK, indexResponse);
@@ -52,6 +59,12 @@ public Action OnWebRequest(WebConnection connection, const char[] url, const cha
 
 		return Plugin_Stop;
 	}
+
+	if (StrEqual(url, "/google")) {
+		connection.QueueResponse(WebStatus_Found, googleResponse);
+
+		return Plugin_Stop;
+	} 
 
 	return Plugin_Continue;
 }
