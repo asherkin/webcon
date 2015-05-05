@@ -259,7 +259,7 @@ DETOUR_DECL_MEMBER0(RunFrame, void)
 
 int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	forwardRequest->PushCell(0);
+	forwardRequest->PushCell((cell_t)connection); // TODO: Wrap this in a Handle.
 	forwardRequest->PushString(url);
 	forwardRequest->PushString(method);
 	forwardRequest->Execute(NULL);
@@ -283,6 +283,31 @@ void LogErrorCallback(void *cls, const char *fm, va_list ap)
 	smutils->FormatArgs(buffer, sizeof(buffer), fm, ap);
 	smutils->LogError(myself, "%s", buffer);
 }
+
+cell_t WebResponse_WebResponse(IPluginContext *context, const cell_t *params)
+{
+	char *content;
+	context->LocalToString(params[1], &content);
+
+	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
+
+	return (cell_t)response; // TODO: Wrap this in a Handle.
+}
+
+cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params)
+{
+	// TODO: These need to be wrapped in Handles.
+	MHD_Connection *connection = (MHD_Connection *)params[1];
+	MHD_Response *response = (MHD_Response *)params[3];
+
+	return MHD_queue_response(connection, params[2], response);;
+}
+
+sp_nativeinfo_t natives[] = {
+	{"WebResponse.WebResponse", WebResponse_WebResponse},
+	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
+	{NULL, NULL}
+};
 
 bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
@@ -318,6 +343,8 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	const char *contentNotFound = "<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
+
+	sharesys->AddNatives(myself, natives);
 
 	forwardRequest = forwards->CreateForward("OnWebRequest", ET_Hook, 3, NULL, Param_Cell, Param_String, Param_String);
 
