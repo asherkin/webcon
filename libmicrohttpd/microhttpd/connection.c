@@ -2832,6 +2832,8 @@ MHD_get_connection_info (struct MHD_Connection *connection,
       return (const union MHD_ConnectionInfo *) &connection->daemon;
     case MHD_CONNECTION_INFO_CONNECTION_FD:
       return (const union MHD_ConnectionInfo *) &connection->socket_fd;
+    case MHD_CONNECTION_INFO_SOCKET_CONTEXT:
+      return (const union MHD_ConnectionInfo *) &connection->socket_context;
     default:
       return NULL;
     };
