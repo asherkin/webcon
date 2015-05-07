@@ -4,13 +4,15 @@
 
 #include "microhttpd.h"
 
+#include <fcntl.h>
+#include <sys/types.h>
+
 #ifndef _WIN32
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
-#include <fcntl.h>
 #define closesocket close
 #define ioctlsocket ioctl
 #define WSAGetLastError() errno
