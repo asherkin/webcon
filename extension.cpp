@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 #define closesocket close
 #define ioctlsocket ioctl
 #define WSAGetLastError() errno
@@ -287,16 +288,6 @@ void ConnectionTypeHandler::OnHandleDestroy(HandleType_t type, void *object)
 	// Do nothing.
 }
 
-cell_t WebResponse_WebResponse(IPluginContext *context, const cell_t *params)
-{
-	char *content;
-	context->LocalToString(params[1], &content);
-
-	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
-
-	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
-}
-
 cell_t WebResponse_AddHeader(IPluginContext *context, const cell_t *params)
 {
 	HandleSecurity security;
@@ -316,6 +307,55 @@ cell_t WebResponse_AddHeader(IPluginContext *context, const cell_t *params)
 	context->LocalToString(params[3], &content);
 
 	return MHD_add_response_header(response, header, content);
+}
+
+cell_t WebStringResponse_WebStringResponse(IPluginContext *context, const cell_t *params)
+{
+	char *content;
+	context->LocalToString(params[1], &content);
+
+	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
+
+	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
+}
+
+cell_t WebBinaryResponse_WebBinaryResponse(IPluginContext *context, const cell_t *params)
+{
+	char *content;
+	context->LocalToString(params[1], &content);
+
+	MHD_Response *response = MHD_create_response_from_buffer(params[2], (void *)content, MHD_RESPMEM_MUST_COPY);
+
+	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
+}
+
+cell_t WebFileResponse_WebFileResponse(IPluginContext *context, const cell_t *params)
+{
+	char *path;
+	context->LocalToString(params[1], &path);
+
+	char realPath[PLATFORM_MAX_PATH];
+	smutils->BuildPath(Path_Game, realPath, sizeof(realPath), "%s", path);
+
+#ifdef _WIN32
+	int fd = _open(realPath, _O_RDONLY | _O_BINARY | _O_SEQUENTIAL);
+#else
+	int fd = open(realPath, O_RDONLY);
+#endif
+
+	if (fd == -1) {
+		return context->ThrowNativeError("Failed to open \"%s\" (error %d)", path, errno);
+	}
+
+#ifdef _WIN32
+	long size = _lseek(fd, 0, SEEK_END);
+#else
+	off_t size = lseek(fd, 0, SEEK_END);
+#endif
+
+	MHD_Response *response = MHD_create_response_from_fd(size, fd);
+
+	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
 }
 
 cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params)
@@ -361,8 +401,10 @@ cell_t WebConnection_GetClientAddress(IPluginContext *context, const cell_t *par
 }
 
 sp_nativeinfo_t natives[] = {
-	{"WebResponse.WebResponse", WebResponse_WebResponse},
 	{"WebResponse.AddHeader", WebResponse_AddHeader},
+	{"WebStringResponse.WebStringResponse", WebStringResponse_WebStringResponse},
+	{"WebBinaryResponse.WebBinaryResponse", WebBinaryResponse_WebBinaryResponse},
+	{"WebFileResponse.WebFileResponse", WebFileResponse_WebFileResponse},
 	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
 	{"WebConnection.GetClientAddress", WebConnection_GetClientAddress},
 	{NULL, NULL}
@@ -389,8 +431,8 @@ int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const
 
 void *LogRequestCallback(void *cls, const char *uri, struct MHD_Connection *con)
 {
-	char *ip = inet_ntoa(((sockaddr_in *)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
-	smutils->LogMessage(myself, "Request from %s: %s", ip, uri);
+	//char *ip = inet_ntoa(((sockaddr_in *)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
+	//smutils->LogMessage(myself, "Request from %s: %s", ip, uri);
 	return NULL;
 }
 

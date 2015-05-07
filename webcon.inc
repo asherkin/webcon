@@ -143,8 +143,22 @@ enum WebStatus
 
 methodmap WebResponse < Handle
 {
-	public native WebResponse(const char[] content);
 	public native bool AddHeader(const char[] header, const char[] content);
+};
+
+methodmap WebStringResponse < WebResponse
+{
+	public native WebStringResponse(const char[] content);
+};
+
+methodmap WebBinaryResponse < WebResponse
+{
+	public native WebBinaryResponse(const char[] content, int length);
+};
+
+methodmap WebFileResponse < WebResponse
+{
+	public native WebFileResponse(const char[] path);
 };
 
 methodmap WebConnection < Handle

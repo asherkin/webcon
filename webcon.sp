@@ -5,13 +5,17 @@
 
 WebResponse indexResponse;
 WebResponse googleResponse;
+WebResponse avatarResponse;
 
 public void OnPluginStart()
 {
-	indexResponse = new WebResponse("<!DOCTYPE html>\n<html><body><h1>Hello, World!</h1></body></html>");
+	indexResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body><h1>Hello, World!</h1></body></html>");
 
-	googleResponse = new WebResponse("<!DOCTYPE html>\n<html><body>Redirecting...</body></html>");
+	googleResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body>Redirecting...</body></html>");
 	googleResponse.AddHeader(WebHeader_Location, "https://google.com");
+
+	avatarResponse = new WebFileResponse("avatar.png");
+	avatarResponse.AddHeader(WebHeader_ContentType, "image/png");
 }
 
 // This isn't very good, but hey, test code.
@@ -53,7 +57,7 @@ public Action OnWebRequest(WebConnection connection, const char[] url, const cha
 
 		Format(buffer, sizeof(buffer), "<!DOCTYPE html>\n<html><body><h1>Connected Players</h1><ul>%s</ul></body></html>", buffer);
 
-		WebResponse response = new WebResponse(buffer);
+		WebResponse response = new WebStringResponse(buffer);
 		connection.QueueResponse(WebStatus_OK, response);
 		delete response;
 
@@ -64,7 +68,13 @@ public Action OnWebRequest(WebConnection connection, const char[] url, const cha
 		connection.QueueResponse(WebStatus_Found, googleResponse);
 
 		return Plugin_Stop;
-	} 
+	}
+
+	if (StrEqual(url, "/avatar")) {
+		connection.QueueResponse(WebStatus_OK, avatarResponse);
+
+		return Plugin_Stop;
+	}
 
 	return Plugin_Continue;
 }
