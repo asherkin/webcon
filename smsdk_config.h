@@ -40,7 +40,7 @@
 /* Basic information exposed publicly */
 #define SMEXT_CONF_NAME        "Webcon"
 #define SMEXT_CONF_DESCRIPTION ""
-#define SMEXT_CONF_VERSION     ""
+#define SMEXT_CONF_VERSION     __DATE__
 #define SMEXT_CONF_AUTHOR      "Asher \"asherkin\" Baker"
 #define SMEXT_CONF_URL         "https://limetech.org/"
 #define SMEXT_CONF_LOGTAG      "WEBCON"

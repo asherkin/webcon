@@ -189,7 +189,6 @@ class WebconConfig(object):
   def ConfigureForExtension(self, context, compiler):
     compiler.cxxincludes += [
       os.path.join(context.currentSourcePath),
-      os.path.join(context.currentSourcePath, 'sdk'),
       os.path.join(self.sm_root, 'public'),
       os.path.join(self.sm_root, 'public', 'extensions'),
       os.path.join(self.sm_root, 'public', 'sourcepawn'),
