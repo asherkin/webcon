@@ -167,7 +167,9 @@ methodmap WebConnection < Handle
 	public native bool GetClientAddress(char[] buffer, int length);
 };
 
-forward Action OnWebRequest(WebConnection connection, const char[] url, const char[] method);
+typedef WebRequestHandler = function bool (WebConnection connection, const char[] method, const char[] url);
+
+native bool Web_RegisterRequestHandler(const char[] id, WebRequestHandler handler, const char[] name = "", const char[] description = "");
 
 public Extension __ext_Webcon = 
 {

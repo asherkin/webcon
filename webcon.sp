@@ -6,9 +6,12 @@
 WebResponse indexResponse;
 WebResponse googleResponse;
 WebResponse avatarResponse;
+WebResponse defaultResponse;
 
 public void OnPluginStart()
 {
+	Web_RegisterRequestHandler("test", OnWebRequest, "WebCon Test", "Test WebCon Responses");
+
 	indexResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body><h1>Hello, World!</h1></body></html>");
 
 	googleResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body>Redirecting...</body></html>");
@@ -16,6 +19,8 @@ public void OnPluginStart()
 
 	avatarResponse = new WebFileResponse("avatar.png");
 	avatarResponse.AddHeader(WebHeader_ContentType, "image/png");
+
+	defaultResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>");
 }
 
 // This isn't very good, but hey, test code.
@@ -23,12 +28,12 @@ void EscapeHTML(char[] buffer, int length)
 {
 	ReplaceString(buffer, length, "&", "&amp;");
 	ReplaceString(buffer, length, "\"", "&quot;");
-	ReplaceString(buffer, length, "'", "&apos;");
+	ReplaceString(buffer, length, "'", "&#39;");
 	ReplaceString(buffer, length, "<", "&lt;");
 	ReplaceString(buffer, length, ">", "&gt;");
 }
 
-public Action OnWebRequest(WebConnection connection, const char[] url, const char[] method)
+public bool OnWebRequest(WebConnection connection, const char[] method, const char[] url)
 {
 	char address[WEB_CLIENT_ADDRESS_LENGTH];
 	connection.GetClientAddress(address, sizeof(address));
@@ -36,15 +41,13 @@ public Action OnWebRequest(WebConnection connection, const char[] url, const cha
 	PrintToServer("%s - %s - %s", address, method, url);
 
 	if (StrEqual(url, "/")) {
-		connection.QueueResponse(WebStatus_OK, indexResponse);
-
-		return Plugin_Stop;
+		return connection.QueueResponse(WebStatus_OK, indexResponse);
 	} 
 
 	if (StrEqual(url, "/players")) {
-		char buffer[2048];
+		char buffer[12753];
 
-		char name[65];
+		char name[187];
 		for (int i = 1; i <= MaxClients; ++i) {
 			if (!IsClientConnected(i)) {
 				continue;
@@ -58,23 +61,19 @@ public Action OnWebRequest(WebConnection connection, const char[] url, const cha
 		Format(buffer, sizeof(buffer), "<!DOCTYPE html>\n<html><body><h1>Connected Players</h1><ul>%s</ul></body></html>", buffer);
 
 		WebResponse response = new WebStringResponse(buffer);
-		connection.QueueResponse(WebStatus_OK, response);
+		bool success = connection.QueueResponse(WebStatus_OK, response);
 		delete response;
 
-		return Plugin_Stop;
+		return success;
 	}
 
 	if (StrEqual(url, "/google")) {
-		connection.QueueResponse(WebStatus_Found, googleResponse);
-
-		return Plugin_Stop;
+		return connection.QueueResponse(WebStatus_Found, googleResponse);
 	}
 
 	if (StrEqual(url, "/avatar")) {
-		connection.QueueResponse(WebStatus_OK, avatarResponse);
-
-		return Plugin_Stop;
+		return connection.QueueResponse(WebStatus_OK, avatarResponse);
 	}
 
-	return Plugin_Continue;
+	return connection.QueueResponse(WebStatus_NotFound, defaultResponse);
 }

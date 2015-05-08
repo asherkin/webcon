@@ -34,9 +34,55 @@ CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
 
 MHD_Daemon *httpDaemon;
-MHD_Response *responseNotFound;
 
-IForward *forwardRequest;
+MHD_Response *responseNotFound;
+MHD_Response *responseInternalServerError;
+
+struct PluginRequestHandler
+{
+	PluginRequestHandler(IPluginContext *context, funcid_t function, const char *name, const char *description);
+	~PluginRequestHandler();
+
+	bool Execute(MHD_Connection *connection, const char *method, const char *url);
+
+	IChangeableForward *callback;
+	char *name;
+	char *description;
+};
+
+PluginRequestHandler::PluginRequestHandler(IPluginContext *context, funcid_t function, const char *name, const char *description) {
+	callback = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_Cell, Param_String, Param_String);
+	callback->AddFunction(context, function);
+
+	this->name = strdup(name);
+	this->description = strdup(description);
+}
+
+PluginRequestHandler::~PluginRequestHandler() {
+	forwards->ReleaseForward(callback);
+
+	free(name);
+	free(description);
+}
+
+bool PluginRequestHandler::Execute(MHD_Connection *connection, const char *method, const char *url) {
+	Handle_t handle = (Handle_t)(MHD_get_connection_info(connection, MHD_CONNECTION_INFO_SOCKET_CONTEXT)->socket_context);
+
+	if (handle == BAD_HANDLE) {
+		return false;
+	}
+
+	callback->PushCell(handle);
+	callback->PushString(method);
+	callback->PushString(url);
+
+	cell_t result;
+	callback->Execute(&result);
+
+	return (result != 0);
+}
+
+PluginRequestHandler *defaultHandler;
 
 struct PendingSocket
 {
@@ -403,6 +449,29 @@ cell_t WebConnection_GetClientAddress(IPluginContext *context, const cell_t *par
 	return 1;
 }
 
+cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
+{
+	char *id;
+	context->LocalToString(params[1], &id);
+	if (strlen(id) == 0) {
+		return 0;
+	}
+
+	char *name;
+	context->LocalToString(params[3], &name);
+
+	char *description;
+	context->LocalToString(params[4], &description);
+
+	if (defaultHandler) {
+		delete defaultHandler;
+	}
+
+	defaultHandler = new PluginRequestHandler(context, params[2], name, description);
+
+	return 1;
+}
+
 sp_nativeinfo_t natives[] = {
 	{"WebResponse.AddHeader", WebResponse_AddHeader},
 	{"WebStringResponse.WebStringResponse", WebStringResponse_WebStringResponse},
@@ -410,29 +479,29 @@ sp_nativeinfo_t natives[] = {
 	{"WebFileResponse.WebFileResponse", WebFileResponse_WebFileResponse},
 	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
 	{"WebConnection.GetClientAddress", WebConnection_GetClientAddress},
+	{"Web_RegisterRequestHandler", Web_RegisterRequestHandler},
 	{NULL, NULL}
 };
 
-int DefaultConnectionHandler(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
+int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	Handle_t handle = (Handle_t)(MHD_get_connection_info(connection, MHD_CONNECTION_INFO_SOCKET_CONTEXT)->socket_context);
-
-	if (handle == BAD_HANDLE) {
-		return MHD_NO;
+	if (defaultHandler && defaultHandler->callback->GetFunctionCount() == 0) {
+		delete defaultHandler;
+		defaultHandler = NULL;
 	}
 
-	forwardRequest->PushCell(handle);
-	forwardRequest->PushString(url);
-	forwardRequest->PushString(method);
-	forwardRequest->Execute(NULL);
+	if (!defaultHandler) {
+		return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
+	}
 
-	// Blindly queue this for now, it'll fail if any response was queued in the forward.
-	MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
+	if (!defaultHandler->Execute(connection, method, url)) {
+		return MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+	}
 
 	return MHD_YES;
 }
 
-void *LogRequestCallback(void *cls, const char *uri, struct MHD_Connection *con)
+void *LogRequestCallback(void *cls, const char *uri, MHD_Connection *con)
 {
 	//char *ip = inet_ntoa(((sockaddr_in *)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
 	//smutils->LogMessage(myself, "Request from %s: %s", ip, uri);
@@ -522,6 +591,9 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	const char *contentNotFound = "<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
 
+	const char *contentInternalServerError = "<!DOCTYPE html>\n<html><body><h1>500 Internal Server Error</h1></body></html>";
+	responseInternalServerError = MHD_create_response_from_buffer(strlen(contentInternalServerError), (void *)contentInternalServerError, MHD_RESPMEM_PERSISTENT);
+
 	handleTypeResponse = handlesys->CreateType("WebResponse", &handlerResponseType, 0, NULL, NULL, myself->GetIdentity(), NULL);
 
 	HandleAccess connectionAccessRules;
@@ -532,8 +604,6 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	handleTypeConnection = handlesys->CreateType("WebConnection", &handlerConnectionType, 0, NULL, &connectionAccessRules, myself->GetIdentity(), NULL);
 
 	sharesys->AddNatives(myself, natives);
-
-	forwardRequest = forwards->CreateForward("OnWebRequest", ET_Hook, 3, NULL, Param_Cell, Param_String, Param_String);
 
 	detourProcessAccept->EnableDetour();
 	
@@ -546,13 +616,15 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Webcon::SDK_OnUnload()
 {
+	if (defaultHandler) {
+		delete defaultHandler;
+	}
+
 	if (detourRunFrame) {
 		detourRunFrame->DisableDetour();
 	}
 	
 	detourProcessAccept->DisableDetour();
-
-	forwards->ReleaseForward(forwardRequest);
 
 	handlesys->RemoveType(handleTypeConnection, myself->GetIdentity());
 
