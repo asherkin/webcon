@@ -10,7 +10,7 @@ WebResponse defaultResponse;
 
 public void OnPluginStart()
 {
-	Web_RegisterRequestHandler("test", OnWebRequest, "WebCon Test", "Test WebCon Responses");
+	Web_RegisterRequestHandler("test", OnWebRequest, "Webcon Test", "Test Webcon Responses");
 
 	indexResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body><h1>Hello, World!</h1></body></html>");
 

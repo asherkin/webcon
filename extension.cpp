@@ -23,6 +23,8 @@
 #include "utlvector.h"
 #include "netadr.h"
 
+#include "sm_namehashset.h"
+
 Webcon g_Webcon;
 SMEXT_LINK(&g_Webcon);
 
@@ -40,32 +42,68 @@ MHD_Response *responseInternalServerError;
 
 struct PluginRequestHandler
 {
-	PluginRequestHandler(IPluginContext *context, funcid_t function, const char *name, const char *description);
+	static bool matches(const char *key, const PluginRequestHandler &value);
+
+	PluginRequestHandler(const char *id, IPluginContext *context, funcid_t function, const char *name, const char *description);
 	~PluginRequestHandler();
+
+	// TODO: Once we update to a version of SM with modern AMTL,
+	// this needs to be converted to a move constructor.
+	// (and the copy ctor deletes below can go)
+	PluginRequestHandler(ke::Moveable<PluginRequestHandler> other);
+
+	PluginRequestHandler(PluginRequestHandler const &other) = delete;
+    PluginRequestHandler &operator =(PluginRequestHandler const &other) = delete;
 
 	bool Execute(MHD_Connection *connection, const char *method, const char *url);
 
 	IChangeableForward *callback;
+	char *id;
 	char *name;
 	char *description;
 };
 
-PluginRequestHandler::PluginRequestHandler(IPluginContext *context, funcid_t function, const char *name, const char *description) {
+bool PluginRequestHandler::matches(const char *key, const PluginRequestHandler &value)
+{
+	return (strcmp(key, value.id) == 0);
+}
+
+PluginRequestHandler::PluginRequestHandler(const char *id, IPluginContext *context, funcid_t function, const char *name, const char *description)
+{
 	callback = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_Cell, Param_String, Param_String);
 	callback->AddFunction(context, function);
 
+	this->id = strdup(id);
 	this->name = strdup(name);
 	this->description = strdup(description);
 }
 
-PluginRequestHandler::~PluginRequestHandler() {
-	forwards->ReleaseForward(callback);
+PluginRequestHandler::PluginRequestHandler(ke::Moveable<PluginRequestHandler> other)
+{
+	callback = other->callback;
+	id = other->id;
+	name = other->name;
+	description = other->description;
 
+	other->callback = NULL;
+	other->id = NULL;
+	other->name = NULL;
+	other->description = NULL;
+}
+
+PluginRequestHandler::~PluginRequestHandler()
+{
+	if (callback) {
+		forwards->ReleaseForward(callback);
+	}
+
+	free(id);
 	free(name);
 	free(description);
 }
 
-bool PluginRequestHandler::Execute(MHD_Connection *connection, const char *method, const char *url) {
+bool PluginRequestHandler::Execute(MHD_Connection *connection, const char *method, const char *url)
+{
 	Handle_t handle = (Handle_t)(MHD_get_connection_info(connection, MHD_CONNECTION_INFO_SOCKET_CONTEXT)->socket_context);
 
 	if (handle == BAD_HANDLE) {
@@ -76,13 +114,14 @@ bool PluginRequestHandler::Execute(MHD_Connection *connection, const char *metho
 	callback->PushString(method);
 	callback->PushString(url);
 
-	cell_t result;
+	cell_t result = 0;
 	callback->Execute(&result);
 
 	return (result != 0);
 }
 
-PluginRequestHandler *defaultHandler;
+PluginRequestHandler *defaultRequestHandler;
+NameHashSet<PluginRequestHandler> requestHandlers;
 
 struct PendingSocket
 {
@@ -217,7 +256,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 	creator->ProcessAccept();
 
 	// Just enough to verify if it is RCON or HTTP(S).
-	unsigned char buffer[12];
+	unsigned char buffer[12] = {};
 
 	int count = pendingSockets.Count();
 	for (int i = (count - 1); i >= 0; --i) {
@@ -343,16 +382,16 @@ cell_t WebResponse_AddHeader(IPluginContext *context, const cell_t *params)
 	security.pOwner = context->GetIdentity();
 	security.pIdentity = myself->GetIdentity();
 
-	MHD_Response *response;
+	MHD_Response *response = NULL;
 	HandleError error = handlesys->ReadHandle(params[1], handleTypeResponse, &security, (void **)&response);
 	if (error != HandleError_None) {
 		return context->ThrowNativeError("Invalid response handle %x (error %d)", params[1], error);
 	}
 
-	char *header;
+	char *header = NULL;
 	context->LocalToString(params[2], &header);
 
-	char *content;
+	char *content = NULL;
 	context->LocalToString(params[3], &content);
 
 	return MHD_add_response_header(response, header, content);
@@ -360,7 +399,7 @@ cell_t WebResponse_AddHeader(IPluginContext *context, const cell_t *params)
 
 cell_t WebStringResponse_WebStringResponse(IPluginContext *context, const cell_t *params)
 {
-	char *content;
+	char *content = NULL;
 	context->LocalToString(params[1], &content);
 
 	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
@@ -370,7 +409,7 @@ cell_t WebStringResponse_WebStringResponse(IPluginContext *context, const cell_t
 
 cell_t WebBinaryResponse_WebBinaryResponse(IPluginContext *context, const cell_t *params)
 {
-	char *content;
+	char *content = NULL;
 	context->LocalToString(params[1], &content);
 
 	MHD_Response *response = MHD_create_response_from_buffer(params[2], (void *)content, MHD_RESPMEM_MUST_COPY);
@@ -380,10 +419,10 @@ cell_t WebBinaryResponse_WebBinaryResponse(IPluginContext *context, const cell_t
 
 cell_t WebFileResponse_WebFileResponse(IPluginContext *context, const cell_t *params)
 {
-	char *path;
+	char *path = NULL;
 	context->LocalToString(params[1], &path);
 
-	char realPath[PLATFORM_MAX_PATH];
+	char realPath[PLATFORM_MAX_PATH] = {};
 	smutils->BuildPath(Path_Game, realPath, sizeof(realPath), "%s", path);
 
 #ifdef _WIN32
@@ -451,23 +490,33 @@ cell_t WebConnection_GetClientAddress(IPluginContext *context, const cell_t *par
 
 cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
 {
-	char *id;
+	char *id = NULL;
 	context->LocalToString(params[1], &id);
 	if (strlen(id) == 0) {
 		return 0;
 	}
 
-	char *name;
-	context->LocalToString(params[3], &name);
+	NameHashSet<PluginRequestHandler>::Insert i = requestHandlers.findForAdd(id);
 
-	char *description;
-	context->LocalToString(params[4], &description);
+	if (i.found()) {
+		if (i->callback->GetFunctionCount() != 0) {
+			return 0;
+		}
 
-	if (defaultHandler) {
-		delete defaultHandler;
+		// TODO: Check defaultRequestHandler
+		requestHandlers.remove(i);
+
+		i = requestHandlers.findForAdd(id);
 	}
 
-	defaultHandler = new PluginRequestHandler(context, params[2], name, description);
+	char *name = NULL;
+	context->LocalToString(params[3], &name);
+
+	char *description = NULL;
+	context->LocalToString(params[4], &description);
+
+	PluginRequestHandler handler(id, context, params[2], name, description);
+	requestHandlers.add(i, ke::Moveable<PluginRequestHandler>(handler));
 
 	return 1;
 }
@@ -485,18 +534,104 @@ sp_nativeinfo_t natives[] = {
 
 int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	if (defaultHandler && defaultHandler->callback->GetFunctionCount() == 0) {
-		delete defaultHandler;
-		defaultHandler = NULL;
+	if (strcmp(url, "/") == 0) {
+		if (defaultRequestHandler) {
+			if (!defaultRequestHandler->Execute(connection, method, url)) {
+				return MHD_NO;
+			}
+
+			MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+
+			return MHD_YES;
+		}
+
+		size_t length = 51;
+		char *buffer = (char *)malloc(length + 1);
+		if (!buffer) {
+			return MHD_NO;
+		}
+
+		int cursor = 0;
+		cursor += sprintf(buffer, "<!DOCTYPE html>\n<html><body><dl>");
+
+		for (NameHashSet<PluginRequestHandler>::iterator i = requestHandlers.iter(); !i.empty(); i.next()) {
+			if (i->callback->GetFunctionCount() == 0) {
+				// TODO: These should actually be removed.
+				continue;
+			}
+
+			length += 34 +  strlen(i->id) + strlen(i->name) + strlen(i->description);
+			buffer = (char *)realloc(buffer, length + 1);
+			if (!buffer) {
+				return MHD_NO;
+			}
+
+			cursor += sprintf(buffer + cursor, "<dt><a href=\"/%s\">%s</a></dt><dd>%s</dd>", i->id, i->name, i->description);
+		}
+
+		cursor += sprintf(buffer + cursor, "</dl></body></html>");
+
+		assert(cursor == length);
+
+		MHD_Response *response = MHD_create_response_from_buffer(length, (void *)buffer, MHD_RESPMEM_MUST_FREE);
+		int success = MHD_queue_response(connection, MHD_HTTP_OK, response);
+		MHD_destroy_response(response);
+
+		return success;
 	}
 
-	if (!defaultHandler) {
+	const char *path = "/";
+	const char *id = url + 1;
+	const char *end = strchr(id, '/');
+	char *buffer = NULL;
+
+	if (end) {
+		size_t length = (end - id);
+		buffer = (char *)malloc(length + 1);
+
+		if (!buffer) {
+			return MHD_NO;
+		}
+
+		strncpy(buffer, id, length);
+		buffer[length] = '\0';
+
+		path = end;
+		id = buffer;
+	}
+
+	NameHashSet<PluginRequestHandler>::Result i = requestHandlers.find(id);
+
+	free(buffer);
+
+	bool found = i.found();
+
+	if (found && i->callback->GetFunctionCount() == 0) {
+		// TODO: Check defaultRequestHandler
+		requestHandlers.remove(i);
+
+		found = false;
+	}
+
+	if (!found) {
+		if (defaultRequestHandler) {
+			if (!defaultRequestHandler->Execute(connection, method, url)) {
+				return MHD_NO;
+			}
+
+			MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+
+			return MHD_YES;
+		}
+
 		return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 	}
 
-	if (!defaultHandler->Execute(connection, method, url)) {
-		return MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+	if (!i->Execute(connection, method, path)) {
+		return MHD_NO;
 	}
+
+	MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
 
 	return MHD_YES;
 }
@@ -616,10 +751,6 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Webcon::SDK_OnUnload()
 {
-	if (defaultHandler) {
-		delete defaultHandler;
-	}
-
 	if (detourRunFrame) {
 		detourRunFrame->DisableDetour();
 	}

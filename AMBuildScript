@@ -190,6 +190,7 @@ class WebconConfig(object):
     compiler.cxxincludes += [
       os.path.join(context.currentSourcePath),
       os.path.join(self.sm_root, 'public'),
+      os.path.join(self.sm_root, 'public', 'amtl'),
       os.path.join(self.sm_root, 'public', 'extensions'),
       os.path.join(self.sm_root, 'public', 'sourcepawn'),
     ]
