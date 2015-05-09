@@ -547,13 +547,19 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		NameHashSet<PluginRequestHandler>::Result i = requestHandlers.find(defaultRequestHandler);
 		assert(i.found()); // It should have always been cleaned up before getting here.
 
-		if (!i->Execute(connection, method, url)) {
-			return MHD_NO;
+		if (i->callback->GetFunctionCount() != 0) {
+			if (!i->Execute(connection, method, url)) {
+				return MHD_NO;
+			}
+
+			MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+
+			return MHD_YES;
+		} else {
+			defaultRequestHandler = NULL;
+			
+			requestHandlers.remove(i);
 		}
-
-		MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
-
-		return MHD_YES;
 	}
 
 	if (strcmp(url, "/") == 0) {

@@ -10,12 +10,14 @@ WebResponse defaultResponse;
 
 public void OnPluginStart()
 {
-	// Generate the ID so we can load multiple for testing.
+	// Generate an ID so we can load multiple copies for testing.
 	// Regular plugins should have a fixed, unique ID.
 	char id[14];
 	Format(id, sizeof(id), "test_%x", GetMyHandle());
 
-	Web_RegisterRequestHandler(id, OnWebRequest, "Webcon Test", "Test Webcon Responses");
+	if (!Web_RegisterRequestHandler(id, OnWebRequest, "Webcon Test", "Test Webcon Responses")) {
+		SetFailState("Failed to register request handler.");
+	}
 
 	indexResponse = new WebStringResponse("<!DOCTYPE html>\n<html><body><h1>Hello, World!</h1></body></html>");
 
