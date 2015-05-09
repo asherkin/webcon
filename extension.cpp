@@ -543,7 +543,7 @@ sp_nativeinfo_t natives[] = {
 
 int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	if (*url == '\0') {
+	if (url[0] == '\0') {
 		return MHD_NO;
 	}
 
@@ -595,7 +595,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 				return MHD_NO;
 			}
 
-			cursor += sprintf(buffer + cursor, "<dt><a href=\"/%s\">%s</a></dt><dd>%s</dd>", i->id, i->name, i->description);
+			cursor += sprintf(buffer + cursor, "<dt><a href=\"/%s\">%s</a></dt><dd>%s</dd>", i->id, ((i->name[0] != '\0') ? i->name : i->id), i->description);
 		}
 
 		cursor += sprintf(buffer + cursor, "</dl></body></html>");
@@ -610,7 +610,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 	}
 
 	const char *id = url + 1;
-	if (*id == '\0') {
+	if (id[0] == '\0') {
 		return MHD_NO;
 	}
 
