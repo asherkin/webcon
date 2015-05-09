@@ -120,7 +120,7 @@ bool PluginRequestHandler::Execute(MHD_Connection *connection, const char *metho
 	return (result != 0);
 }
 
-PluginRequestHandler *defaultRequestHandler;
+const char *defaultRequestHandler;
 NameHashSet<PluginRequestHandler> requestHandlers;
 
 struct PendingSocket
@@ -503,7 +503,10 @@ cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
 			return 0;
 		}
 
-		// TODO: Check defaultRequestHandler
+		if (defaultRequestHandler && PluginRequestHandler::matches(defaultRequestHandler, *i)) {
+			defaultRequestHandler = NULL;
+		}
+
 		requestHandlers.remove(i);
 
 		i = requestHandlers.findForAdd(id);
@@ -534,17 +537,26 @@ sp_nativeinfo_t natives[] = {
 
 int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	if (strcmp(url, "/") == 0) {
-		if (defaultRequestHandler) {
-			if (!defaultRequestHandler->Execute(connection, method, url)) {
-				return MHD_NO;
-			}
+	if (*url == '\0') {
+		return MHD_NO;
+	}
 
-			MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+	if (defaultRequestHandler) {
+		// TODO: Check for remapped handlers.
 
-			return MHD_YES;
+		NameHashSet<PluginRequestHandler>::Result i = requestHandlers.find(defaultRequestHandler);
+		assert(i.found()); // It should have always been cleaned up before getting here.
+
+		if (!i->Execute(connection, method, url)) {
+			return MHD_NO;
 		}
 
+		MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
+
+		return MHD_YES;
+	}
+
+	if (strcmp(url, "/") == 0) {
 		size_t length = 51;
 		char *buffer = (char *)malloc(length + 1);
 		if (!buffer) {
@@ -556,8 +568,12 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 
 		for (NameHashSet<PluginRequestHandler>::iterator i = requestHandlers.iter(); !i.empty(); i.next()) {
 			if (i->callback->GetFunctionCount() == 0) {
-				// TODO: Check the defaultRequestHandler
+				if (defaultRequestHandler && PluginRequestHandler::matches(defaultRequestHandler, *i)) {
+					defaultRequestHandler = NULL;
+				}
+
 				i.erase();
+
 				continue;
 			}
 
@@ -581,8 +597,12 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		return success;
 	}
 
-	const char *path = "/";
 	const char *id = url + 1;
+	if (*id == '\0') {
+		return MHD_NO;
+	}
+
+	const char *path = "/";
 	const char *end = strchr(id, '/');
 	char *buffer = NULL;
 
@@ -608,23 +628,16 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 	bool found = i.found();
 
 	if (found && i->callback->GetFunctionCount() == 0) {
-		// TODO: Check defaultRequestHandler
+		if (defaultRequestHandler && PluginRequestHandler::matches(defaultRequestHandler, *i)) {
+			defaultRequestHandler = NULL;
+		}
+
 		requestHandlers.remove(i);
 
 		found = false;
 	}
 
 	if (!found) {
-		if (defaultRequestHandler) {
-			if (!defaultRequestHandler->Execute(connection, method, url)) {
-				return MHD_NO;
-			}
-
-			MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
-
-			return MHD_YES;
-		}
-
 		return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 	}
 
