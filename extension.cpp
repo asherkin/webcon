@@ -55,6 +55,7 @@ struct PluginRequestHandler
 	PluginRequestHandler(PluginRequestHandler const &other) = delete;
     PluginRequestHandler &operator =(PluginRequestHandler const &other) = delete;
 
+    bool IsAlive();
 	bool Execute(MHD_Connection *connection, const char *method, const char *url);
 
 	IChangeableForward *callback;
@@ -100,6 +101,11 @@ PluginRequestHandler::~PluginRequestHandler()
 	free(id);
 	free(name);
 	free(description);
+}
+
+bool PluginRequestHandler::IsAlive()
+{
+	return (callback->GetFunctionCount() > 0);
 }
 
 bool PluginRequestHandler::Execute(MHD_Connection *connection, const char *method, const char *url)
@@ -499,7 +505,7 @@ cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
 	NameHashSet<PluginRequestHandler>::Insert i = requestHandlers.findForAdd(id);
 
 	if (i.found()) {
-		if (i->callback->GetFunctionCount() != 0) {
+		if (i->IsAlive()) {
 			return 0;
 		}
 
@@ -547,7 +553,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		NameHashSet<PluginRequestHandler>::Result i = requestHandlers.find(defaultRequestHandler);
 		assert(i.found()); // It should have always been cleaned up before getting here.
 
-		if (i->callback->GetFunctionCount() != 0) {
+		if (i->IsAlive()) {
 			if (!i->Execute(connection, method, url)) {
 				return MHD_NO;
 			}
@@ -557,7 +563,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 			return MHD_YES;
 		} else {
 			defaultRequestHandler = NULL;
-			
+
 			requestHandlers.remove(i);
 		}
 	}
@@ -573,7 +579,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		cursor += sprintf(buffer, "<!DOCTYPE html>\n<html><body><dl>");
 
 		for (NameHashSet<PluginRequestHandler>::iterator i = requestHandlers.iter(); !i.empty(); i.next()) {
-			if (i->callback->GetFunctionCount() == 0) {
+			if (!i->IsAlive()) {
 				if (defaultRequestHandler && PluginRequestHandler::matches(defaultRequestHandler, *i)) {
 					defaultRequestHandler = NULL;
 				}
@@ -633,7 +639,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 
 	bool found = i.found();
 
-	if (found && i->callback->GetFunctionCount() == 0) {
+	if (found && !i->IsAlive()) {
 		if (defaultRequestHandler && PluginRequestHandler::matches(defaultRequestHandler, *i)) {
 			defaultRequestHandler = NULL;
 		}
