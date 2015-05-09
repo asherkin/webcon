@@ -556,7 +556,8 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 
 		for (NameHashSet<PluginRequestHandler>::iterator i = requestHandlers.iter(); !i.empty(); i.next()) {
 			if (i->callback->GetFunctionCount() == 0) {
-				// TODO: These should actually be removed.
+				// TODO: Check the defaultRequestHandler
+				i.erase();
 				continue;
 			}
 
