@@ -589,13 +589,29 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 				continue;
 			}
 
-			length += 34 +  strlen(i->id) + strlen(i->name) + strlen(i->description);
+			const char *name = i->name;
+			bool noName = (name[0] == '\0');
+			if (noName) {
+				name = i->id;
+			}
+
+			const char *description = i->description;
+			if (description[0] == '\0') {
+				description = "<i>No Description</i>";
+			}
+
+			length += 35 + strlen(i->id) + strlen(name) + strlen(description);
+			if (noName) {
+				length += 7;
+			}
+
 			buffer = (char *)realloc(buffer, length + 1);
 			if (!buffer) {
 				return MHD_NO;
 			}
 
-			cursor += sprintf(buffer + cursor, "<dt><a href=\"/%s\">%s</a></dt><dd>%s</dd>", i->id, ((i->name[0] != '\0') ? i->name : i->id), i->description);
+			// TODO: Escape these.
+			cursor += sprintf(buffer + cursor, "<dt><a href=\"/%s/\">%s%s%s</a></dt><dd>%s</dd>", i->id, (noName ? "<i>" : ""), name, (noName ? "</i>" : ""), description);
 		}
 
 		cursor += sprintf(buffer + cursor, "</dl></body></html>");
