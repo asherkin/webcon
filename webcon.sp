@@ -45,7 +45,7 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 	char address[WEB_CLIENT_ADDRESS_LENGTH];
 	connection.GetClientAddress(address, sizeof(address));
 
-	PrintToServer("%s - %s - %s", address, method, url);
+	PrintToServer(">>> (%x) %s - %s - %s", GetMyHandle(), address, method, url);
 
 	if (StrEqual(url, "/")) {
 		return connection.QueueResponse(WebStatus_OK, indexResponse);

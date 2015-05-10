@@ -293,7 +293,8 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			// About 15 seconds.
 			if (pendingSocket->timeout > 1000) {
 				if (rconServer) {
-					rconServer->HandleFailedRconAuth(pendingSocket->address);
+					// TODO: We need logic to exclude clients connected to the HTTP server.
+					//rconServer->HandleFailedRconAuth(pendingSocket->address);
 				}
 
 				rootconsole->ConsolePrint("(%d) Listen socket timed out.", pendingSocket->socket);
@@ -525,6 +526,10 @@ cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
 	context->LocalToString(params[4], &description);
 
 	PluginRequestHandler handler(id, context, params[2], name, description);
+
+	// TODO: Test code
+	//defaultRequestHandler = handler.id;
+
 	requestHandlers.add(i, ke::Moveable<PluginRequestHandler>(handler));
 
 	return 1;
