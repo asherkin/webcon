@@ -669,6 +669,28 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		return MHD_queue_response(connection, MHD_HTTP_NOT_FOUND, responseNotFound);
 	}
 
+	// While it's cleaner to do this above, redirecting to a 404 seems... bad.
+	if (!end) {
+		size_t length = strlen(url);
+		char *redirect = (char *)malloc(length + 2);
+		if (!redirect) {
+			return MHD_NO;
+		}
+
+		strcpy(redirect, url);
+		redirect[length] = '/';
+		redirect[length + 1] = '\0';
+
+		MHD_Response *response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
+		MHD_add_response_header(response, MHD_HTTP_HEADER_LOCATION, redirect);
+		int success = MHD_queue_response(connection, MHD_HTTP_FOUND, response);
+		MHD_destroy_response(response);
+
+		free(redirect);
+
+		return success;
+	}
+
 	if (!i->Execute(connection, method, path)) {
 		return MHD_NO;
 	}
