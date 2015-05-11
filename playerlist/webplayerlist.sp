@@ -16,8 +16,12 @@ WebResponse notFoundResponse;
 int lastDataGeneration;
 WebResponse dataResponse;
 
+bool isTF2;
+
 public void OnPluginStart()
 {
+	isTF2 = (GetEngineVersion() == Engine_TF2);
+
 	if (!Web_RegisterRequestHandler("players", OnWebRequest, "Player List")) {
 		SetFailState("Failed to register request handler.");
 	}
@@ -131,7 +135,13 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 			bool bot = IsFakeClient(i);
 
 			length += WriteByte(buffer[length], sizeof(buffer) - length, bot);
-			length += WriteByte(buffer[length], sizeof(buffer) - length, GetEntProp(i, Prop_Send, "m_iClass"));
+
+			int tfclass = 0;
+			if (isTF2) {
+				tfclass = GetEntProp(i, Prop_Send, "m_iClass");
+			}
+			length += WriteByte(buffer[length], sizeof(buffer) - length, tfclass);
+
 			length += WriteShort(buffer[length], sizeof(buffer) - length, GetEntProp(resourceEnt, Prop_Send, "m_iTotalScore", _, i));
 
 			if (bot) {
