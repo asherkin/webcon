@@ -36,9 +36,7 @@ CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
 
 MHD_Daemon *httpDaemon;
-
 MHD_Response *responseNotFound;
-MHD_Response *responseInternalServerError;
 
 struct PluginRequestHandler
 {
@@ -603,13 +601,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		assert(i.found()); // It should have always been cleaned up before getting here.
 
 		if (i->IsAlive()) {
-			if (!i->Execute(connection, method, url)) {
-				return MHD_NO;
-			}
-
-			MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
-
-			return MHD_YES;
+			return i->Execute(connection, method, url) ? MHD_YES : MHD_NO;
 		} else {
 			defaultRequestHandler = NULL;
 
@@ -740,13 +732,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		return success;
 	}
 
-	if (!i->Execute(connection, method, path)) {
-		return MHD_NO;
-	}
-
-	MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, responseInternalServerError);
-
-	return MHD_YES;
+	return i->Execute(connection, method, path) ? MHD_YES : MHD_NO;
 }
 
 void *LogRequestCallback(void *cls, const char *uri, MHD_Connection *con)
@@ -836,11 +822,9 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		return false;
 	}
 
-	const char *contentNotFound = "<!DOCTYPE html>\n<html><body><h1>404 Not Found</h1></body></html>";
+	const char *contentNotFound = "Not Found";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
-
-	const char *contentInternalServerError = "<!DOCTYPE html>\n<html><body><h1>500 Internal Server Error</h1></body></html>";
-	responseInternalServerError = MHD_create_response_from_buffer(strlen(contentInternalServerError), (void *)contentInternalServerError, MHD_RESPMEM_PERSISTENT);
+	MHD_add_response_header(responseNotFound, MHD_HTTP_HEADER_CONTENT_TYPE, "text/plain; charset=UTF-8");
 
 	handleTypeResponse = handlesys->CreateType("WebResponse", &handlerResponseType, 0, NULL, NULL, myself->GetIdentity(), NULL);
 
