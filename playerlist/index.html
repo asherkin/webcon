@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Player List</title>
+    <style type="text/css">/*! normalize.css v3.0.3 | MIT License | github.com/necolas/normalize.css */html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%}body{margin:0}article,aside,details,figcaption,figure,footer,header,hgroup,main,menu,nav,section,summary{display:block}audio,canvas,progress,video{display:inline-block;vertical-align:baseline}audio:not([controls]){display:none;height:0}[hidden],template{display:none}a{background-color:transparent}a:active,a:hover{outline:0}abbr[title]{border-bottom:1px dotted}b,strong{font-weight:bold}dfn{font-style:italic}h1{font-size:2em;margin:.67em 0}mark{background:#ff0;color:#000}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sup{top:-0.5em}sub{bottom:-0.25em}img{border:0}svg:not(:root){overflow:hidden}figure{margin:1em 40px}hr{box-sizing:content-box;height:0}pre{overflow:auto}code,kbd,pre,samp{font-family:monospace,monospace;font-size:1em}button,input,optgroup,select,textarea{color:inherit;font:inherit;margin:0}button{overflow:visible}button,select{text-transform:none}button,html input[type="button"],input[type="reset"],input[type="submit"]{-webkit-appearance:button;cursor:pointer}button[disabled],html input[disabled]{cursor:default}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}input{line-height:normal}input[type="checkbox"],input[type="radio"]{box-sizing:border-box;padding:0}input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{height:auto}input[type="search"]{-webkit-appearance:textfield;box-sizing:content-box}input[type="search"]::-webkit-search-cancel-button,input[type="search"]::-webkit-search-decoration{-webkit-appearance:none}fieldset{border:1px solid silver;margin:0 2px;padding:.35em .625em .75em}legend{border:0;padding:0}textarea{overflow:auto}optgroup{font-weight:bold}table{border-collapse:collapse;border-spacing:0}td,th{padding:0}</style>
+    <style type="text/css">
+    @font-face {
+      font-family: TF2;
+      src: url('tf2.ttf');
+    }
+
+    html {
+      height: 100%;
+      box-sizing: border-box;
+      color: #F7EDD4;
+      background-color: #636261;
+      background-image: url('background.jpg');
+      background-size: cover;
+      font-family: Arial;
+    }
+
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 5% 10%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      flex: 0 1 auto;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .title {
+      flex: 1 1 0px;
+      margin: 1%;
+      padding: 10px 10px 5px 10px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 2.5em;
+      line-height: 1em;
+      border: 2px solid #F5DCA3;
+      font-family: 'TF2';
+      border-radius: 10px;
+      text-shadow: 1px 1.5px #333;
+    }
+
+    .title-blu {
+      background-color: rgba(88, 133, 162, 0.66);
+    }
+
+    .title-red {
+      background-color: rgba(184, 56, 59, 0.66);
+      flex-direction: row-reverse;
+    }
+
+    .team-name {
+      flex: 2 1 auto;
+      text-transform: uppercase;
+    }
+
+    .team-players {
+      flex: 1 1 auto;
+      text-transform: lowercase;
+      font-size: 0.75em;
+      line-height: 1em;
+      margin-top: 0.4em;
+      margin-bottom: -0.1em;
+    }
+
+    .team-score {
+      flex: 1 1 auto;
+      margin-top: -0.1em;
+      font-size: 2.5em;
+      text-shadow: 2.5px 3px #333;
+    }
+
+    .title-blu .team-players, .title-blu .team-score, .title-red .team-name {
+      text-align: right;
+    }
+
+    .scoreboard {
+      flex: 1 1 auto;
+      padding: 5px 10px;
+      background-color: rgba(0, 0, 0, 0.33);
+      border: 2px solid #D3C0A0;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      font-size: 0.75em;
+    }
+
+    .server {
+      flex: 0 1 auto;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .score-area {
+      flex: 1 1 auto;
+      display: flex;
+      justify-content: space-between;
+      overflow-y: auto;
+    }
+
+    .scores {
+      flex: 1 1 0px;
+      padding: 10px;
+    }
+
+    .scores-blu {
+      border-right: 1px solid #1A1A1A;
+    }
+
+    .scores-red {
+      border-left: 1px solid #1A1A1A;
+    }
+
+    .scores table {
+      width: 100%;
+    }
+
+    .scores thead {
+      font-size: 0.9em;
+      color: white;
+      border-bottom: 1px solid white;
+    }
+
+    .scores tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .scores tbody tr:hover td:first-child {
+      border-top-left-radius: 5px;
+      border-bottom-left-radius: 5px;
+    }
+
+    .scores tbody tr:hover td:last-child {
+      border-top-right-radius: 5px;
+      border-bottom-right-radius: 5px;
+    }
+
+    .scores tbody tr:first-child:hover td:first-child {
+      border-top-left-radius: 0;
+    }
+
+    .scores tbody tr:first-child:hover td:last-child {
+      border-top-right-radius: 0;
+    }
+
+    .scores-blu tbody {
+        color: #99CCFF;
+    }
+
+    .scores-red tbody {
+        color: #FF4040;
+    }
+
+    .scores th, .scores td {
+      padding: 5px;
+    }
+
+    th.scores-name {
+      text-align: left;
+    }
+
+    .scores-avatar {
+      width: 39px;
+    }
+
+    .avatar {
+      border-radius: 3px;
+    }
+
+    td.scores-avatar {
+      padding: 2px 5px 2px 2px;
+      line-height: 0;
+      height: 36px;
+    }
+
+    .scores-class {
+      width: 36px;
+    }
+
+    td.scores-class {
+      padding: 2px;
+      line-height: 0;
+      height: 36px;
+    }
+
+    .scores-score, .scores-ping {
+      width: 1px;
+      text-align: right;
+    }
+
+    .spectators {
+      flex: 0 1 auto;
+    }
+
+    .class {
+      background-image: url('classes.png');
+      background-repeat: no-repeat;
+      background-size: 96px;
+      display: block;
+      width: 32px;
+      height: 32px;
+    }
+
+    .class-demoman, .class-4 {
+      background-position: 0 0;
+    }
+
+    .class-engineer, .class-9 {
+      background-position: -32px 0;
+    }
+
+    .class-heavy, .class-6 {
+      background-position: -64px 0;
+    }
+
+    .class-medic, .class-5 {
+      background-position: 0 -32px;
+    }
+
+    .class-pyro, .class-7 {
+      background-position: -32px -32px;
+    }
+
+    .class-scout, .class-1 {
+      background-position: -64px -32px;
+    }
+
+    .class-sniper, .class-2 {
+      background-position: 0 -64px;
+    }
+
+    .class-soldier, .class-3 {
+      background-position: -32px -64px;
+    }
+
+    .class-spy, .class-8 {
+      background-position: -64px -64px;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+        <div class="title title-blu">
+            <div class="team-name">Blu</div>
+            <div class="team-players" id="players-blu"></div>
+            <div class="team-score" id="score-blu"></div>
+        </div>
+        <div class="title title-red">
+            <div class="team-name">Red</div>
+            <div class="team-players" id="players-red"></div>
+            <div class="team-score" id="score-red"></div>
+        </div>
+    </div>
+    <div class="scoreboard">
+        <div class="server">
+          <div id="server-name">&nbsp;</div>
+          <div id="server-time">&nbsp;</div>
+        </div>
+        <div class="score-area">
+          <div class="scores scores-blu">
+            <table>
+              <thead>
+                <tr>
+                  <th class="scores-avatar"></th>
+                  <th class="scores-name">Name</th>
+                  <th class="scores-class"></th>
+                  <th class="scores-score">Score</th>
+                  <th class="scores-ping">Ping</th>
+                </tr>
+              </thead>
+              <tbody id="scores-blu"></tbody>
+            </table>
+          </div>
+          <div class="scores scores-red">
+            <table>
+              <thead>
+                <tr>
+                  <th class="scores-avatar"></th>
+                  <th class="scores-name">Name</th>
+                  <th class="scores-class"></th>
+                  <th class="scores-score">Score</th>
+                  <th class="scores-ping">Ping</th>
+                </tr>
+              </thead>
+              <tbody id="scores-red"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="spectators" id="spectators">&nbsp;</div>
+    </div>
+    <script type="text/javascript">
+      var playersBLU = document.getElementById('players-blu');
+      var scoreBLU = document.getElementById('score-blu');
+      var playersRED = document.getElementById('players-red');
+      var scoreRED = document.getElementById('score-red');
+      var serverName = document.getElementById('server-name');
+      var serverTime = document.getElementById('server-time');
+      var playerListBLU = document.getElementById('scores-blu');
+      var playerListRED = document.getElementById('scores-red');
+      var spectatorList = document.getElementById('spectators');
+
+      var sendRequest = function(callback) {
+        var request = new XMLHttpRequest();
+        request.open("GET", "data", true);
+        request.responseType = "arraybuffer";
+        request.onload = callback;
+        request.send(null);
+      }
+
+      var parseResponse = function() {
+        var arrayBuffer = this.response;
+        if (!arrayBuffer) {
+          return;
+        }
+
+        var buffer = new DataView(arrayBuffer);
+        var cursor = 0;
+
+        var players = [];
+
+        var bluTeamScore = buffer.getInt32(cursor, true); cursor += 4;
+        var redTeamScore = buffer.getInt32(cursor, true); cursor += 4;
+
+        var numPlayers = buffer.getInt8(cursor, true); cursor += 1;
+        for (var i = 0; i < numPlayers; ++i) {
+          var player = {
+            team: 0,
+            name: '',
+            bot: false,
+            tfclass: 0,
+            score: 0,
+            accountid: 0,
+            ping: 0
+          }
+
+          players.push(player);
+
+          player.team = buffer.getInt8(cursor, true); cursor += 1;
+
+          while (true) {
+            var character = buffer.getInt8(cursor, true); cursor += 1;
+            if (character == 0) {
+              break;
+            }
+
+            player.name += String.fromCharCode(character);
+          }
+
+          try {
+            // Convert UTF-8 to UTF-16
+            player.name = decodeURIComponent(escape(player.name));
+          } catch(e) {
+            console.log('Failed to convert name to UTF-16: ' + player.name);
+          }
+
+          if (player.team == 1) {
+            continue;
+          }
+
+          player.bot = buffer.getInt8(cursor, true); cursor += 1;
+          player.tfclass = buffer.getInt8(cursor, true); cursor += 1;
+          player.score = buffer.getInt16(cursor, true); cursor += 2;
+
+          if (player.bot == 1) {
+            continue;
+          }
+
+          player.accountid = buffer.getUint32(cursor, true); cursor += 4;
+          player.ping = buffer.getInt16(cursor, true); cursor += 2;
+        }
+
+        if(cursor != buffer.byteLength) {
+          console.log('Failed to parse payload: ' + cursor + ' != ' + buffer.byteLength);
+          return;
+        }
+
+        scoreBLU.textContent = bluTeamScore;
+        scoreRED.textContent = redTeamScore;
+
+        players.sort(function(a, b) {
+          var sort = b.score - a.score;
+
+          if (sort == 0) {
+            sort = a.name.localeCompare(b.name);
+          }
+
+          return sort;
+        });
+
+        var numBluPlayers = 0;
+        var newBluPlayerList = document.createElement('tbody');
+
+        var numRedPlayers = 0;
+        var newRedPlayerList = document.createElement('tbody');
+
+        for (var i = 0; i < players.length; ++i) {
+          var player = players[i];
+
+          var row;
+          if (player.team == 3) {
+            numBluPlayers++;
+            row = newBluPlayerList.insertRow();
+          } else if (player.team == 2) {
+            numRedPlayers++;
+            row = newRedPlayerList.insertRow();
+          } else {
+            continue;
+          }
+
+          var avatar = row.insertCell();
+          avatar.classList.add('scores-avatar');
+
+          if (player.accountid != 0) {
+            avatar.innerHTML = '<img class="avatar" src="https://www.traderep.org/avatar/' + player.accountid + '">';
+          }
+
+          var name = row.insertCell();
+          name.classList.add('scores-name');
+          name.textContent = player.name;
+
+          var tfclass = row.insertCell();
+          tfclass.classList.add('scores-class');
+
+          if (player.tfclass != 0) {
+            tfclass.innerHTML = '<span class="class class-' + player.tfclass + '"></span>';
+          }
+
+          var score = row.insertCell();
+          score.classList.add('scores-score');
+          score.textContent = player.score;
+
+          var ping = row.insertCell();
+          ping.classList.add('scores-ping');
+          ping.textContent = player.bot ? 'BOT' : player.ping;
+        }
+
+        playersBLU.textContent = numBluPlayers + ' player' + (numBluPlayers != 1 ? 's' : '');
+        playerListBLU.innerHTML = newBluPlayerList.innerHTML;
+
+        playersRED.textContent = numRedPlayers + ' player' + (numRedPlayers != 1 ? 's' : '');
+        playerListRED.innerHTML = newRedPlayerList.innerHTML;
+
+        setTimeout(function() {
+          sendRequest(parseResponse);
+        }, 10000);
+      }
+
+      sendRequest(parseResponse);
+    </script>
+  </body>
+</html>

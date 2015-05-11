@@ -1,0 +1,22 @@
+int bluScore;
+int redScore;
+
+char numPlayers;
+
+struct Player {
+    char team;
+    string name;
+
+    if (team != 1) {
+        char bot;
+        char class;
+        short score;
+    
+        if (bot != 1) {
+            uint accountid;
+            short ping;
+        }
+    }
+};
+
+Player players[numPlayers] <optimize=false>;

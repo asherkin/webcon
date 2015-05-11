@@ -8,6 +8,7 @@ folder_list = [
   'addons/sourcemod/gamedata',
   'addons/sourcemod/scripting',
   'addons/sourcemod/scripting/include',
+  'addons/sourcemod/configs/web/players',
 ]
 
 # Create the distribution folder hierarchy.
@@ -29,5 +30,11 @@ def CopyFiles(src, dest, files):
     builder.AddCopy(source_path, dest_entry)
 
 CopyFiles('', 'addons/sourcemod/gamedata', ['webcon.games.txt'])
-CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
 CopyFiles('', 'addons/sourcemod/scripting/include', ['webcon.inc'])
+
+# Test Plugin
+CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
+
+# Player List Plugin
+CopyFiles('playerlist', 'addons/sourcemod/scripting', ['webplayerlist.sp'])
+CopyFiles('playerlist', 'addons/sourcemod/configs/web/players', ['index.html', 'notfound.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
