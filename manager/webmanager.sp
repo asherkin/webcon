@@ -47,23 +47,27 @@ public int OnOpenIDCheckAuthenticationResponse(Handle request, bool failure, boo
 	int index = pendingCheckAuthenticationRequests.FindValue(connection);
 	if (index == -1) {
 		PrintToServer("Got a reply for a connection we're not waiting on o:");
+		delete request;
 		return 0;
 	}
 
 	if (failure || !requestSuccessful || statusCode != k_EHTTPStatusCode200OK) {
 		pendingCheckAuthenticationRequests.Set(index, CheckAuthenticationState_Error, 1);
+		delete request;
 		return 0;
 	}
 
 	int bodySize;
 	if (!SteamWorks_GetHTTPResponseBodySize(request, bodySize)) {
 		pendingCheckAuthenticationRequests.Set(index, CheckAuthenticationState_Error, 1);
+		delete request;
 		return 0;
 	}
 
 	char[] body = new char[bodySize];
 	if (!SteamWorks_GetHTTPResponseBodyData(request, body, bodySize)) {
 		pendingCheckAuthenticationRequests.Set(index, CheckAuthenticationState_Error, 1);
+		delete request;
 		return 0;
 	}
 
@@ -71,6 +75,7 @@ public int OnOpenIDCheckAuthenticationResponse(Handle request, bool failure, boo
 		// Forged OpenID request.
 		PrintToServer(">>> Claim FAILED verification.");
 		pendingCheckAuthenticationRequests.Set(index, CheckAuthenticationState_Forged, 1);
+		delete request;
 		return 0;
 	}
 
@@ -78,6 +83,7 @@ public int OnOpenIDCheckAuthenticationResponse(Handle request, bool failure, boo
 	PrintToServer(">>> Claim passed verification.");
 	pendingCheckAuthenticationRequests.Set(index, CheckAuthenticationState_Valid, 1);
 
+	delete request;
 	return 0;
 }
 
