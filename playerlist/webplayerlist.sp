@@ -139,7 +139,7 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 			}
 
 			length += WriteInt(buffer[length], sizeof(buffer) - length, GetSteamAccountID(i, false));
-			length += WriteShort(buffer[length], sizeof(buffer) - length, GetEntProp(resourceEnt, Prop_Send, "m_iPing", i));
+			length += WriteShort(buffer[length], sizeof(buffer) - length, GetEntProp(resourceEnt, Prop_Send, "m_iPing", _, i));
 		}
 
 		WriteByte(buffer[numPlayersPosition], sizeof(buffer) - numPlayersPosition, numPlayers);
