@@ -35,6 +35,9 @@ CopyFiles('', 'addons/sourcemod/scripting/include', ['webcon.inc'])
 # Test Plugin
 CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
 
-# Player List Plugin
+# Scoreboard Plugin
 CopyFiles('scoreboard', 'addons/sourcemod/scripting', ['webscoreboard.sp'])
 CopyFiles('scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['index.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
+
+# Manager Plugin
+CopyFiles('manager', 'addons/sourcemod/scripting', ['webmanager.sp'])
