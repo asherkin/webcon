@@ -453,6 +453,68 @@ cell_t WebFileResponse_WebFileResponse(IPluginContext *context, const cell_t *pa
 	return handlesys->CreateHandle(handleTypeResponse, response, context->GetIdentity(), myself->GetIdentity(), NULL);
 }
 
+cell_t WebConnection_GetClientAddress(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	MHD_Connection *connection;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeConnection, &security, (void **)&connection);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid connection handle %x (error %d)", params[1], error);
+	}
+
+	sockaddr_in *address = (sockaddr_in *)MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr;
+	char *ip = inet_ntoa(address->sin_addr);
+	context->StringToLocal(params[2], params[3], ip);
+
+	return 1;
+}
+
+cell_t WebConnection_GetRequestData(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	MHD_Connection *connection;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeConnection, &security, (void **)&connection);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid connection handle %x (error %d)", params[1], error);
+	}
+
+	MHD_ValueKind kind;
+	switch (params[2]) {
+		case 0:
+			kind = MHD_GET_ARGUMENT_KIND;
+			break;
+		case 1:
+			kind = MHD_POSTDATA_KIND;
+			break;
+		case 2:
+			kind = MHD_COOKIE_KIND;
+			break;
+		case 3:
+			kind = MHD_HEADER_KIND;
+			break;
+		default:
+			return context->ThrowNativeError("Unknown WebRequestDataType %d", params[2]);
+	}
+
+	char *key;
+	context->LocalToString(params[3], &key);
+
+	const char *value = MHD_lookup_connection_value(connection, kind, key);
+	if (!value) {
+		return 0;
+	}
+	
+	context->StringToLocal(params[4], params[5], value);
+
+	return 1;
+}
+
 cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params)
 {
 	HandleError error;
@@ -474,25 +536,6 @@ cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params
 	}
 
 	return MHD_queue_response(connection, params[2], response);;
-}
-
-cell_t WebConnection_GetClientAddress(IPluginContext *context, const cell_t *params)
-{
-	HandleSecurity security;
-	security.pOwner = context->GetIdentity();
-	security.pIdentity = myself->GetIdentity();
-
-	MHD_Connection *connection;
-	HandleError error = handlesys->ReadHandle(params[1], handleTypeConnection, &security, (void **)&connection);
-	if (error != HandleError_None) {
-		return context->ThrowNativeError("Invalid connection handle %x (error %d)", params[1], error);
-	}
-
-	sockaddr_in *address = (sockaddr_in *)MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr;
-	char *ip = inet_ntoa(address->sin_addr);
-	context->StringToLocal(params[2], params[3], ip);
-
-	return 1;
 }
 
 cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
@@ -540,8 +583,9 @@ sp_nativeinfo_t natives[] = {
 	{"WebStringResponse.WebStringResponse", WebStringResponse_WebStringResponse},
 	{"WebBinaryResponse.WebBinaryResponse", WebBinaryResponse_WebBinaryResponse},
 	{"WebFileResponse.WebFileResponse", WebFileResponse_WebFileResponse},
-	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
 	{"WebConnection.GetClientAddress", WebConnection_GetClientAddress},
+	{"WebConnection.GetRequestData", WebConnection_GetRequestData},
+	{"WebConnection.QueueResponse", WebConnection_QueueResponse},
 	{"Web_RegisterRequestHandler", Web_RegisterRequestHandler},
 	{NULL, NULL}
 };

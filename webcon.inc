@@ -141,6 +141,14 @@ enum WebStatus
 #define WebHeader_WWWAuthenticate "WWW-Authenticate"
 #define WebHeader_AccessControlAllowOrigin "Access-Control-Allow-Origin"
 
+enum WebRequestDataType
+{
+	WebRequestDataType_Get,
+	WebRequestDataType_Post,
+	WebRequestDataType_Cookie,
+	WebRequestDataType_Header,
+}
+
 methodmap WebResponse < Handle
 {
 	public native bool AddHeader(const char[] header, const char[] content);
@@ -163,8 +171,9 @@ methodmap WebFileResponse < WebResponse
 
 methodmap WebConnection < Handle
 {
-	public native bool QueueResponse(WebStatus status, WebResponse response);
 	public native bool GetClientAddress(char[] buffer, int length);
+	public native bool GetRequestData(WebRequestDataType type, const char[] key, char[] buffer, int length);
+	public native bool QueueResponse(WebStatus status, WebResponse response);
 };
 
 typedef WebRequestHandler = function bool (WebConnection connection, const char[] method, const char[] url);
