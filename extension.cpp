@@ -411,7 +411,7 @@ cell_t WebStringResponse_WebStringResponse(IPluginContext *context, const cell_t
 
 	MHD_Response *response = MHD_create_response_from_buffer(strlen(content), (void *)content, MHD_RESPMEM_MUST_COPY);
 
-	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
+	return handlesys->CreateHandle(handleTypeResponse, response, context->GetIdentity(), myself->GetIdentity(), NULL);
 }
 
 cell_t WebBinaryResponse_WebBinaryResponse(IPluginContext *context, const cell_t *params)
@@ -421,7 +421,7 @@ cell_t WebBinaryResponse_WebBinaryResponse(IPluginContext *context, const cell_t
 
 	MHD_Response *response = MHD_create_response_from_buffer(params[2], (void *)content, MHD_RESPMEM_MUST_COPY);
 
-	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
+	return handlesys->CreateHandle(handleTypeResponse, response, context->GetIdentity(), myself->GetIdentity(), NULL);
 }
 
 cell_t WebFileResponse_WebFileResponse(IPluginContext *context, const cell_t *params)
@@ -450,7 +450,7 @@ cell_t WebFileResponse_WebFileResponse(IPluginContext *context, const cell_t *pa
 
 	MHD_Response *response = MHD_create_response_from_fd(size, fd);
 
-	return handlesys->CreateHandle(handleTypeResponse, response, NULL, myself->GetIdentity(), NULL);
+	return handlesys->CreateHandle(handleTypeResponse, response, context->GetIdentity(), myself->GetIdentity(), NULL);
 }
 
 cell_t WebConnection_QueueResponse(IPluginContext *context, const cell_t *params)
