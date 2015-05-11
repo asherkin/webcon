@@ -5,7 +5,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define BASE_PATH "configs/web/players/"
+#define BASE_PATH "configs/web/scoreboard/"
 
 WebResponse indexResponse;
 WebResponse backgroundResponse;
@@ -22,7 +22,7 @@ public void OnPluginStart()
 {
 	isTF2 = (GetEngineVersion() == Engine_TF2);
 
-	if (!Web_RegisterRequestHandler("players", OnWebRequest, "Player List")) {
+	if (!Web_RegisterRequestHandler("scoreboard", OnWebRequest, "Scoreboard", "Live TF2 Scoreboard")) {
 		SetFailState("Failed to register request handler.");
 	}
 
@@ -30,7 +30,7 @@ public void OnPluginStart()
 
 	BuildPath(Path_SM, path, sizeof(path), BASE_PATH ... "index.html");
 	indexResponse = new WebFileResponse(path);
-	indexResponse.AddHeader(WebHeader_ContentType, "text/html");
+	indexResponse.AddHeader(WebHeader_ContentType, "text/html; charset=UTF-8");
 
 	BuildPath(Path_SM, path, sizeof(path), BASE_PATH ... "background.jpg");
 	backgroundResponse = new WebFileResponse(path);
@@ -47,9 +47,9 @@ public void OnPluginStart()
 	fontResponse.AddHeader(WebHeader_ContentType, "application/x-font-ttf");
 	fontResponse.AddHeader(WebHeader_CacheControl, "public, max-age=2629740");
 
-	BuildPath(Path_SM, path, sizeof(path), BASE_PATH ... "notfound.html");
-	notFoundResponse = new WebFileResponse(path);
-	notFoundResponse.AddHeader(WebHeader_ContentType, "text/html");
+	notFoundResponse = new WebStringResponse("Not Found");
+	notFoundResponse.AddHeader(WebHeader_ContentType, "text/plain; charset=UTF-8");
+	notFoundResponse.AddHeader("Refresh", "0; url=/scoreboard/"); // TODO: Need a way to get the base URL.
 }
 
 int WriteByte(char[] buffer, int length, int value)

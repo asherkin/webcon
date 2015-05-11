@@ -8,7 +8,7 @@ folder_list = [
   'addons/sourcemod/gamedata',
   'addons/sourcemod/scripting',
   'addons/sourcemod/scripting/include',
-  'addons/sourcemod/configs/web/players',
+  'addons/sourcemod/configs/web/scoreboard',
 ]
 
 # Create the distribution folder hierarchy.
@@ -36,5 +36,5 @@ CopyFiles('', 'addons/sourcemod/scripting/include', ['webcon.inc'])
 CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
 
 # Player List Plugin
-CopyFiles('playerlist', 'addons/sourcemod/scripting', ['webplayerlist.sp'])
-CopyFiles('playerlist', 'addons/sourcemod/configs/web/players', ['index.html', 'notfound.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
+CopyFiles('scoreboard', 'addons/sourcemod/scripting', ['webscoreboard.sp'])
+CopyFiles('scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['index.html', 'notfound.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
