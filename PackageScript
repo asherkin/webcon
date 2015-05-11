@@ -37,4 +37,4 @@ CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
 
 # Player List Plugin
 CopyFiles('scoreboard', 'addons/sourcemod/scripting', ['webscoreboard.sp'])
-CopyFiles('scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['index.html', 'notfound.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
+CopyFiles('scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['index.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
