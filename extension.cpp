@@ -779,7 +779,9 @@ void NotifyConnectionCallback(void *cls, MHD_Connection *connection, void **sock
 
 			error = g_pHandleSys->FreeHandle(*handle, &security);
 
-			if (error != HandleError_None) {
+			// We can't control SM freeing our handles on unload.
+			// This should be safe as MHD_stop_daemon is called inside SDK_OnUnload.
+			if (error != HandleError_None && error != HandleError_Freed) {
 				smutils->LogError(myself, "Error freeing handle for connection. (%x, %d)", *handle, error);
 			}
 
@@ -815,6 +817,15 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	} else if (!CRConServer::HandleFailedRconAuthFunction) {
 		smutils->LogError(myself, "WARNING: Scan for HandleFailedRconAuth failed, bad clients will not be banned.");
 	}
+	
+	handleTypeResponse = handlesys->CreateType("WebResponse", &handlerResponseType, 0, NULL, NULL, myself->GetIdentity(), NULL);
+
+	HandleAccess connectionAccessRules;
+	g_pHandleSys->InitAccessDefaults(NULL, &connectionAccessRules);
+
+	connectionAccessRules.access[HandleAccess_Delete] = HANDLE_RESTRICT_IDENTITY;
+
+	handleTypeConnection = handlesys->CreateType("WebConnection", &handlerConnectionType, 0, NULL, &connectionAccessRules, myself->GetIdentity(), NULL);
 
 	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_URI_LOG_CALLBACK, LogRequestCallback, NULL, MHD_OPTION_EXTERNAL_LOGGER, LogErrorCallback, NULL, MHD_OPTION_NOTIFY_CONNECTION, NotifyConnectionCallback, NULL, MHD_OPTION_END);
 	if (!httpDaemon) {
@@ -825,15 +836,6 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	const char *contentNotFound = "Not Found";
 	responseNotFound = MHD_create_response_from_buffer(strlen(contentNotFound), (void *)contentNotFound, MHD_RESPMEM_PERSISTENT);
 	MHD_add_response_header(responseNotFound, MHD_HTTP_HEADER_CONTENT_TYPE, "text/plain; charset=UTF-8");
-
-	handleTypeResponse = handlesys->CreateType("WebResponse", &handlerResponseType, 0, NULL, NULL, myself->GetIdentity(), NULL);
-
-	HandleAccess connectionAccessRules;
-	g_pHandleSys->InitAccessDefaults(NULL, &connectionAccessRules);
-
-	connectionAccessRules.access[HandleAccess_Delete] = HANDLE_RESTRICT_IDENTITY;
-
-	handleTypeConnection = handlesys->CreateType("WebConnection", &handlerConnectionType, 0, NULL, &connectionAccessRules, myself->GetIdentity(), NULL);
 
 	sharesys->AddNatives(myself, natives);
 
@@ -854,13 +856,13 @@ void Webcon::SDK_OnUnload()
 	
 	detourProcessAccept->DisableDetour();
 
-	handlesys->RemoveType(handleTypeConnection, myself->GetIdentity());
-
-	handlesys->RemoveType(handleTypeResponse, myself->GetIdentity());
-
 	MHD_destroy_response(responseNotFound);
 
 	MHD_stop_daemon(httpDaemon);
+
+	handlesys->RemoveType(handleTypeConnection, myself->GetIdentity());
+
+	handlesys->RemoveType(handleTypeResponse, myself->GetIdentity());
 
 	gameconfs->CloseGameConfigFile(gameConfig);
 }
