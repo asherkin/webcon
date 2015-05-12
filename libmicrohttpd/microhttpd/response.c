@@ -368,7 +368,7 @@ MHD_create_response_from_fd_at_offset (size_t size,
   struct MHD_Response *response;
 
   response = MHD_create_response_from_callback (size,
-						4 * 1024,
+						1024 * 1024,
 						&file_reader,
 						NULL,
 						&free_callback);
