@@ -26,7 +26,6 @@ class WebconConfig(object):
   def __init__(self):
     self.sdks = {}
     self.binaries = []
-    self.mms_root = None
     self.sm_root = None
     self.extensions = []
 
@@ -40,7 +39,7 @@ class WebconConfig(object):
     if builder.options.sm_path:
       self.sm_root = builder.options.sm_path
     else:
-      self.sm_root = ResolveEnvPath('SOURCEMOD16', 'sourcemod-1.6')
+      self.sm_root = ResolveEnvPath('SOURCEMOD17', 'sourcemod-1.7')
       if not self.sm_root:
         self.sm_root = ResolveEnvPath('SOURCEMOD', 'sourcemod')
       if not self.sm_root:
