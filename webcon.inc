@@ -152,6 +152,7 @@ enum WebRequestDataType
 methodmap WebResponse < Handle
 {
 	public native bool AddHeader(const char[] header, const char[] content);
+	public native bool RemoveHeader(const char[] header, const char[] content = NULL_STRING);
 };
 
 methodmap WebStringResponse < WebResponse

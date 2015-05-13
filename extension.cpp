@@ -402,6 +402,37 @@ cell_t WebResponse_AddHeader(IPluginContext *context, const cell_t *params)
 	return MHD_add_response_header(response, header, content);
 }
 
+cell_t WebResponse_RemoveHeader(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	MHD_Response *response = NULL;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeResponse, &security, (void **)&response);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid response handle %x (error %d)", params[1], error);
+	}
+
+	char *header = NULL;
+	context->LocalToString(params[2], &header);
+
+	char *content = NULL;
+	context->LocalToStringNULL(params[3], &content);
+	
+	if (content) {
+		return MHD_del_response_header(response, header, content);
+	}
+	
+	const char *constent;
+	bool success = false;
+	while ((constent = MHD_get_response_header(response, header))) {
+		success = MHD_del_response_header(response, header, content) || success;
+	}
+	
+	return success ? MHD_YES : MHD_NO;
+}
+
 cell_t WebStringResponse_WebStringResponse(IPluginContext *context, const cell_t *params)
 {
 	char *content = NULL;
@@ -578,6 +609,7 @@ cell_t Web_RegisterRequestHandler(IPluginContext *context, const cell_t *params)
 
 sp_nativeinfo_t natives[] = {
 	{"WebResponse.AddHeader", WebResponse_AddHeader},
+	{"WebResponse.RemoveHeader", WebResponse_RemoveHeader},
 	{"WebStringResponse.WebStringResponse", WebStringResponse_WebStringResponse},
 	{"WebBinaryResponse.WebBinaryResponse", WebBinaryResponse_WebBinaryResponse},
 	{"WebFileResponse.WebFileResponse", WebFileResponse_WebFileResponse},
