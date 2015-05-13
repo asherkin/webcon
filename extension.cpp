@@ -735,17 +735,11 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 	return i->Execute(connection, method, path) ? MHD_YES : MHD_NO;
 }
 
-void *LogRequestCallback(void *cls, const char *uri, MHD_Connection *con)
-{
-	//char *ip = inet_ntoa(((sockaddr_in *)MHD_get_connection_info(con, MHD_CONNECTION_INFO_CLIENT_ADDRESS)->client_addr)->sin_addr);
-	//smutils->LogMessage(myself, "Request from %s: %s", ip, uri);
-	return NULL;
-}
-
 void LogErrorCallback(void *cls, const char *fm, va_list ap)
 {
 	char buffer[2048];
-	smutils->FormatArgs(buffer, sizeof(buffer), fm, ap);
+	size_t bytes = smutils->FormatArgs(buffer, sizeof(buffer), fm, ap);
+	buffer[bytes - 1] = '\0'; // Strip newline.
 	smutils->LogError(myself, "%s", buffer);
 }
 
@@ -827,7 +821,7 @@ bool Webcon::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	handleTypeConnection = handlesys->CreateType("WebConnection", &handlerConnectionType, 0, NULL, &connectionAccessRules, myself->GetIdentity(), NULL);
 
-	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_URI_LOG_CALLBACK, LogRequestCallback, NULL, MHD_OPTION_EXTERNAL_LOGGER, LogErrorCallback, NULL, MHD_OPTION_NOTIFY_CONNECTION, NotifyConnectionCallback, NULL, MHD_OPTION_END);
+	httpDaemon = MHD_start_daemon(MHD_USE_DEBUG | MHD_USE_NO_LISTEN_SOCKET, 0, NULL, NULL, &DefaultConnectionHandler, NULL, MHD_OPTION_EXTERNAL_LOGGER, LogErrorCallback, NULL, MHD_OPTION_NOTIFY_CONNECTION, NotifyConnectionCallback, NULL, MHD_OPTION_END);
 	if (!httpDaemon) {
 		strncpy(error, "Failed to start HTTP server", maxlength);
 		return false;
