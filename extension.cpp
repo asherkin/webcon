@@ -424,10 +424,10 @@ cell_t WebResponse_RemoveHeader(IPluginContext *context, const cell_t *params)
 		return MHD_del_response_header(response, header, content);
 	}
 	
-	const char *constent;
 	bool success = false;
-	while ((constent = MHD_get_response_header(response, header))) {
-		success = MHD_del_response_header(response, header, content) || success;
+	const char *value;
+	while ((value = MHD_get_response_header(response, header))) {
+		success = MHD_del_response_header(response, header, value) || success;
 	}
 	
 	return success ? MHD_YES : MHD_NO;
