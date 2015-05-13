@@ -6,6 +6,9 @@
 #pragma newdecls required
 
 #define SESSION_ID_LENGTH 33
+#define SESSION_TIMEOUT 86400
+#define SESSION_REAP_INTERVAL 600
+
 #define CLAIMED_ID_BASE "http://steamcommunity.com/openid/id/"
 
 ConVar managerUrl;
@@ -50,6 +53,8 @@ public void OnPluginStart()
 	managerUrl.AddChangeHook(OnManagerUrlChanged);
 	
 	AutoExecConfig();
+	
+	RegAdminCmd("webmanager_dump_sessions", OnDumpSessionsCommand, ADMFLAG_ROOT, "Prints active Web Manager sessions.");
 
 	indexResponse = new WebStringResponse("<!DOCTYPE html>\n<a href=\"login\">Login</a><br><a href=\"secret\">Secret</a>");
 	indexResponse.AddHeader(WebHeader_ContentType, "text/html; charset=UTF-8");
@@ -72,6 +77,8 @@ public void OnPluginStart()
 	pendingCheckAuthenticationRequests = new ArrayList(CheckAuthenticationData_MAX);
 	
 	sessions = new StringMap();
+	
+	CreateTimer(SESSION_REAP_INTERVAL.0, OnReapSessionTimer, _, TIMER_REPEAT);
 }
 
 public void OnManagerUrlChanged(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -94,6 +101,86 @@ public void OnManagerUrlChanged(ConVar convar, const char[] oldValue, const char
 	
 	loginRedirectResponse.RemoveHeader(WebHeader_Location);
 	loginRedirectResponse.AddHeader(WebHeader_Location, buffer);
+}
+
+public Action OnDumpSessionsCommand(int client, int args)
+{
+	StringMapSnapshot snapshot = sessions.Snapshot();
+	
+	int i = snapshot.Length;
+	int display = 0;
+	while (--i >= 0) {
+		char id[SESSION_ID_LENGTH];
+		snapshot.GetKey(i, id, sizeof(id));
+		
+		DataPack sessionPack;
+		if (!sessions.GetValue(id, sessionPack)) {
+			continue;
+		}
+		
+		sessionPack.Reset();
+		
+		int lastActive = sessionPack.ReadCell();
+		int age = GetTime() - lastActive;
+		if (age > SESSION_TIMEOUT) {
+			delete sessionPack;
+			sessions.Remove(id);
+			continue;
+		}
+		
+		char remainingTime[9];
+		FormatTime(remainingTime, sizeof(remainingTime), "%H:%M:%S", SESSION_TIMEOUT - age);
+		
+		char ip[WEB_CLIENT_ADDRESS_LENGTH];
+		sessionPack.ReadString(ip, sizeof(ip));
+		
+		char steamid[32];
+		sessionPack.ReadString(steamid, sizeof(steamid));
+		
+		display++;
+		if (display == 1) {
+			ReplyToCommand(client, "     %32s %8s %15s %20s", "Session ID", "Expires", "IP", "SteamID");
+		}
+		
+		ReplyToCommand(client, "%3d. %32s %8s %15s %20s", display, id, remainingTime, ip, steamid);
+	}
+	
+	if (display == 0) {
+		ReplyToCommand(client, "There are no active sessions.");
+		
+		delete snapshot;
+		return Plugin_Handled;
+	}
+	
+	delete snapshot;
+	return Plugin_Handled;
+}
+
+public Action OnReapSessionTimer(Handle timer)
+{
+	StringMapSnapshot snapshot = sessions.Snapshot();
+	
+	int i = snapshot.Length;
+	while (--i >= 0) {
+		char id[SESSION_ID_LENGTH];
+		snapshot.GetKey(i, id, sizeof(id));
+		
+		DataPack sessionPack;
+		if (!sessions.GetValue(id, sessionPack)) {
+			continue;
+		}
+		
+		sessionPack.Reset();
+		
+		int lastActive = sessionPack.ReadCell();
+		if ((GetTime() - lastActive) > SESSION_TIMEOUT) {
+			delete sessionPack;
+			sessions.Remove(id);
+		}
+	}
+	
+	delete snapshot;
+	return Plugin_Handled;
 }
 
 public int OnOpenIdCheckAuthenticationResponse(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, WebConnection connection)
@@ -185,6 +272,7 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 				connection.GetClientAddress(ip, sizeof(ip));
 				
 				DataPack sessionPack = new DataPack();
+				sessionPack.WriteCell(GetTime());
 				sessionPack.WriteString(ip);
 				sessionPack.WriteString(steamid);
 				
@@ -199,13 +287,24 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 				response.AddHeader(WebHeader_Location, return_url);
 				
 				status = WebStatus_Found;
+			} else {
+				response.AddHeader(WebHeader_SetCookie, "id=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly");
 			}
 
 			bool success = connection.QueueResponse(status, response);
-
 			delete response;
-
 			return success;
+		}
+		
+		char id[SESSION_ID_LENGTH + 1]; // +1 to detect over-length IDs.
+		connection.GetRequestData(WebRequestDataType_Cookie, "id", id, sizeof(id));
+		
+		DataPack sessionPack;
+		if ((strlen(id) + 1) == SESSION_ID_LENGTH && sessions.GetValue(id, sessionPack)) {
+			// Burninate the user's session if they have one.
+			// All responses out of here will either clear the cookie or create a new session.
+			delete sessionPack;
+			sessions.Remove(id);
 		}
 
 		char openid_mode[256];
@@ -290,6 +389,11 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 		
 		sessionPack.Reset();
 		
+		int lastActive = sessionPack.ReadCell();
+		if ((GetTime() - lastActive) > SESSION_TIMEOUT) {
+			return connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
+		}
+		
 		char ip[WEB_CLIENT_ADDRESS_LENGTH];
 		connection.GetClientAddress(ip, sizeof(ip));
 		
@@ -297,13 +401,15 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 		sessionPack.ReadString(session_ip, sizeof(session_ip));
 		
 		if (strcmp(ip, session_ip) != 0) {
-			delete sessionPack;
-			sessions.Remove(id);
 			return connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
 		}
 		
 		char steamid[32];
 		sessionPack.ReadString(steamid, sizeof(steamid));
+		
+		// Update the activity time.
+		sessionPack.Reset();
+		sessionPack.WriteCell(GetTime());
 		
 		AdminId admin = FindAdminByIdentity(AUTHMETHOD_STEAM, steamid);
 		
