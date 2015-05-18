@@ -236,6 +236,69 @@ void GenerateSessionId(char id[SESSION_ID_LENGTH])
 	FormatEx(id, sizeof(id), "%08x%08x%08x%08x", GetURandomInt(), GetURandomInt(), GetURandomInt(), GetURandomInt());
 }
 
+bool ValidateSession(WebConnection connection, char[] buffer, int length)
+{
+	char id[SESSION_ID_LENGTH + 1]; // +1 to detect over-length IDs.
+	connection.GetRequestData(WebRequestDataType_Cookie, "id", id, sizeof(id));
+
+	if ((strlen(id) + 1) != SESSION_ID_LENGTH) {
+		return false;
+	}
+
+	DataPack sessionPack;
+	if (!sessions.GetValue(id, sessionPack)) {
+		return false;
+	}
+
+	sessionPack.Reset();
+
+	int lastActive = sessionPack.ReadCell();
+	if ((GetTime() - lastActive) > SESSION_TIMEOUT) {
+		return false;
+	}
+
+	char ip[WEB_CLIENT_ADDRESS_LENGTH];
+	connection.GetClientAddress(ip, sizeof(ip));
+
+	char session_ip[WEB_CLIENT_ADDRESS_LENGTH];
+	sessionPack.ReadString(session_ip, sizeof(session_ip));
+
+	if (strcmp(ip, session_ip) != 0) {
+		return false;
+	}
+
+	sessionPack.ReadString(buffer, length);
+
+	// Update the activity time.
+	sessionPack.Reset();
+	sessionPack.WriteCell(GetTime());
+
+	return true;
+}
+
+bool RequireSessionAccess(WebConnection connection, bool &success, const char[] command, int flags, bool override_only = false)
+{
+	char steamid[32];
+	if (!ValidateSession(connection, steamid, sizeof(steamid))) {
+		success = connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
+		return false;
+	}
+
+	AdminId admin = FindAdminByIdentity(AUTHMETHOD_STEAM, steamid);
+
+	if (admin == INVALID_ADMIN_ID) {
+		success = connection.QueueResponse(WebStatus_Forbidden, forbiddenResponse);
+		return false;
+	}
+
+	if (!CheckAccess(admin, command, flags, override_only)) {
+		success = connection.QueueResponse(WebStatus_Forbidden, forbiddenResponse);
+		return false;
+	}
+
+	return true;
+}
+
 public bool OnWebRequest(WebConnection connection, const char[] method, const char[] url)
 {
 	if (StrEqual(url, "/login")) {
@@ -377,51 +440,9 @@ public bool OnWebRequest(WebConnection connection, const char[] method, const ch
 	}
 
 	if (StrEqual(url, "/secret")) {
-		char id[SESSION_ID_LENGTH + 1]; // +1 to detect over-length IDs.
-		connection.GetRequestData(WebRequestDataType_Cookie, "id", id, sizeof(id));
-		PrintToServer(">>> id = %s", id);
-		
-		if ((strlen(id) + 1) != SESSION_ID_LENGTH) {
-			return connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
-		}
-		
-		DataPack sessionPack;
-		if (!sessions.GetValue(id, sessionPack)) {
-			return connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
-		}
-		
-		sessionPack.Reset();
-		
-		int lastActive = sessionPack.ReadCell();
-		if ((GetTime() - lastActive) > SESSION_TIMEOUT) {
-			return connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
-		}
-		
-		char ip[WEB_CLIENT_ADDRESS_LENGTH];
-		connection.GetClientAddress(ip, sizeof(ip));
-		
-		char session_ip[WEB_CLIENT_ADDRESS_LENGTH];
-		sessionPack.ReadString(session_ip, sizeof(session_ip));
-		
-		if (strcmp(ip, session_ip) != 0) {
-			return connection.QueueResponse(WebStatus_Found, loginRedirectResponse);
-		}
-		
-		char steamid[32];
-		sessionPack.ReadString(steamid, sizeof(steamid));
-		
-		// Update the activity time.
-		sessionPack.Reset();
-		sessionPack.WriteCell(GetTime());
-		
-		AdminId admin = FindAdminByIdentity(AUTHMETHOD_STEAM, steamid);
-		
-		if (admin == INVALID_ADMIN_ID) {
-			return connection.QueueResponse(WebStatus_Forbidden, forbiddenResponse);
-		}
-		
-		if (!CheckAccess(admin, "sm_rcon", ADMFLAG_RCON)) {
-			return connection.QueueResponse(WebStatus_Forbidden, forbiddenResponse);
+		bool success;
+		if (!RequireSessionAccess(connection, success, "sm_rcon", ADMFLAG_RCON)) {
+			return success;
 		}
 	
 		return connection.QueueResponse(WebStatus_OK, topSecretResponse);
