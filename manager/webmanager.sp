@@ -129,7 +129,10 @@ public Action OnDumpSessionsCommand(int client, int args)
 		}
 		
 		char remainingTime[9];
-		FormatTime(remainingTime, sizeof(remainingTime), "%H:%M:%S", SESSION_TIMEOUT - age);
+		int remainingSeconds = SESSION_TIMEOUT - age;
+		int remainingMinutes = remainingSeconds / 60;
+		int remainingHours = remainingMinutes / 60;
+		FormatEx(remainingTime, sizeof(remainingTime), "%02d:%02d:%02d", remainingHours, remainingMinutes - (remainingHours * 60), remainingSeconds - (remainingMinutes * 60));
 		
 		char ip[WEB_CLIENT_ADDRESS_LENGTH];
 		sessionPack.ReadString(ip, sizeof(ip));
