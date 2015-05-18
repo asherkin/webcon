@@ -51,9 +51,9 @@ struct PluginRequestHandler
 	PluginRequestHandler(ke::Moveable<PluginRequestHandler> other);
 
 	PluginRequestHandler(PluginRequestHandler const &other) = delete;
-    PluginRequestHandler &operator =(PluginRequestHandler const &other) = delete;
+	PluginRequestHandler &operator =(PluginRequestHandler const &other) = delete;
 
-    bool IsAlive();
+	bool IsAlive();
 	bool Execute(MHD_Connection *connection, const char *method, const char *url);
 
 	IChangeableForward *callback;

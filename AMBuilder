@@ -17,11 +17,11 @@ binary.compiler.includes += [
   os.path.join(builder.sourcePath, 'valve'),
   os.path.join(builder.sourcePath, 'libmicrohttpd', 'include'),
 ]
-  
+
 binary.compiler.defines += ['SOURCEMOD_BUILD']
 
 binary.compiler.postlink += [libmicrohttpd.binary]
-  
+
 if builder.target_platform == 'windows':
   binary.compiler.linkflags += ['ws2_32.lib']
 

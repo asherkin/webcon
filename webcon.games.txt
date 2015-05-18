@@ -26,9 +26,9 @@
 			}
 
 			/*
-             * Optional, used to ban clients sending invalid data.
-             *
-             * String: "Banning %s for rcon hacking attempts\n"
+			 * Optional, used to ban clients sending invalid data.
+			 *
+			 * String: "Banning %s for rcon hacking attempts\n"
 			 */
 			"HandleFailedRconAuth"
 			{
