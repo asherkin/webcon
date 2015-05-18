@@ -1,6 +1,6 @@
 #include <sourcemod>
 #include <webcon>
-#include <steamworks>
+#include <SteamWorks>
 
 #pragma semicolon 1
 #pragma newdecls required
