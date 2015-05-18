@@ -151,34 +151,101 @@ enum WebRequestDataType
 
 methodmap WebResponse < Handle
 {
+	/// Add a HTTP header to a response.
+	///
+	/// Multiple instances of the same header can be added to a response with different values.
+	/// This is only valid if the header is specified as a list, but the restriction is not enforced.
+	/// 
+	/// @param  header  Name of HTTP header to add. `WebHeader_*` constants exist for standard headers.
+	/// @param  content Value to send in response for this header.
+	/// @return `true` if the header was sucessfully added, `false` otherwise.
 	public native bool AddHeader(const char[] header, const char[] content);
+
+	/// Remove an added HTTP header from a response.
+	/// 
+	/// @param  header  Name of HTTP header to remove. `WebHeader_*` constants exist for standard headers.
+	/// @param  content If specified, only remove a header matching this value.
+	/// @return `true` if any headers were removed, `false` otherwise.
 	public native bool RemoveHeader(const char[] header, const char[] content = NULL_STRING);
 };
 
 methodmap WebStringResponse < WebResponse
 {
+	/// Create a WebResponse from a character string.
+	///
+	/// The response length is determined automatically and thus is not binary-safe.
+	/// Use `WebBinaryResponse` for binary data.
+	///
+	/// @param  content Content to use for response.
+	/// @return A new WebResponse instance with the specified content as the body.
 	public native WebStringResponse(const char[] content);
 };
 
 methodmap WebBinaryResponse < WebResponse
 {
+	/// Create a WebResponse from binary data.
+	///
+	/// @param  content Content to use for response.
+	/// @param  length  Length of content.
+	/// @return A new WebResponse instance with the specified content as the body.
 	public native WebBinaryResponse(const char[] content, int length);
 };
 
 methodmap WebFileResponse < WebResponse
 {
+	/// Create a WebResponse from a file path.
+	///
+	/// This uses efficient kernel data transfer mechanisms where available, and avoids
+	/// reading the entire file into memory at once (or when not being sent to a client).
+	///
+	/// @param  path Path to response file. Should be constructed using `BuildPath`.
+	/// @return A new WebResponse instance with the specified file content as the body.
+	/// @error  Unable to open file path for reading.
 	public native WebFileResponse(const char[] path);
 };
 
 methodmap WebConnection < Handle
 {
+	/// Get the remote client IP address.
+	///
+	/// @param  buffer Buffer to store the address in. Should be `WEB_CLIENT_ADDRESS_LENGTH` bytes in size.
+	/// @param  length Size of `buffer`.
+	/// @return `true` if the client address was stored in `buffer`, `false` otherwise.
 	public native bool GetClientAddress(char[] buffer, int length);
+	
+	/// Get data sent by the client in the request.
+	///
+	/// @param  type   Source of data. See `WebRequestDataType` for details.
+	/// @param  key    Paramater (GET or POST), Cookie, or Header to get data from.
+	/// @param  buffer Buffer to store the data value in.
+	/// @param  length Size of `buffer`.
+	/// @return `true` if the data exists in the request and was stored in `buffer`, `false` otherwise.
 	public native bool GetRequestData(WebRequestDataType type, const char[] key, char[] buffer, int length);
+	
+	/// Queue a response to send to the client.
+	///
+	/// @param  status   HTTP status code to use for response. See `WebStatus`.
+	/// @param  response WebResonse to queue. You are responsible for deleting the response.
+	/// @return `true` if the response was successfully queued, `false` otherwise.
+	/// @error  Invalid response handle.
 	public native bool QueueResponse(WebStatus status, WebResponse response);
 };
 
+/// Callback for incoming requests.
+///
+/// @param  connection WebConnection handle for the request. Must not be deleted.
+/// @param  method     HTTP method used for request. `WebMethod_*` constants exist for standard methods.
+/// @param  url        URL requested by client.
+/// @return `true` if the request was handled, `false` will terminate the connection.
 typedef WebRequestHandler = function bool (WebConnection connection, const char[] method, const char[] url);
 
+/// Register a request handler.
+///
+/// @param  id          Unique identifier for request handler. Used for virtual hosting.
+/// @param  handler     WebRequestHandler callback for incoming requests.
+/// @param  name        Optional name for handler on index page.
+/// @param  description Optional description for handler on index page.
+/// @return `true` if the handler was sucessfully registered, `false` otherwise.
 native bool Web_RegisterRequestHandler(const char[] id, WebRequestHandler handler, const char[] name = "", const char[] description = "");
 
 public Extension __ext_Webcon = 
