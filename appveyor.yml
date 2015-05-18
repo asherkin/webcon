@@ -1,8 +1,8 @@
 version: '{build}'
 install:
   - cd ..
-  - git clone --depth=50 --branch=1.7-dev https://github.com/alliedmodders/sourcemod
-  - git clone --depth=50 --branch=master https://github.com/alliedmodders/ambuild
+  - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod
+  - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
   - cd ambuild
   - C:\python27\python.exe setup.py install
   - cd %APPVEYOR_BUILD_FOLDER%

@@ -7,9 +7,16 @@ addons:
 compiler:
   - clang
 before_script:
-  - CHECKOUT_DIR=$PWD && cd .. && git clone --depth=50 --branch=1.7-dev https://github.com/alliedmodders/sourcemod && git clone --depth=50 --branch=master https://github.com/alliedmodders/ambuild && cd ambuild && python setup.py install --user && cd $CHECKOUT_DIR
+  - cd ..
+  - git clone --depth=1 --branch=1.7-dev https://github.com/alliedmodders/sourcemod
+  - git clone --depth=1 --branch=master https://github.com/alliedmodders/ambuild
+  - cd ambuild
+  - python setup.py install --user
+  - cd $TRAVIS_BUILD_DIR
+  - git fetch --unshallow
 script:
-  - mkdir build && cd build
+  - mkdir build
+  - cd build
   - python ../configure.py --enable-optimize
   - ~/.local/bin/ambuild
 after_success:
