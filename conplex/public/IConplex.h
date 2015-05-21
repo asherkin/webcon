@@ -6,6 +6,8 @@
 #define SMINTERFACE_CONPLEX_NAME "IConplex"
 #define SMINTERFACE_CONPLEX_VERSION 1
 
+struct sockaddr;
+
 class IConplex: public SMInterface
 {
 public:
@@ -20,8 +22,8 @@ public:
 		PD_NoMatch,
 	};
 
-	typedef ProtocolDetectionState (*ProtocolDetectorCallback)(const char *id, int socket, const unsigned char *buffer, unsigned int bufferLength);
-	typedef bool (*ProtocolHandlerCallback)(const char *id, int socket, const void *address, unsigned int addressLength);
+	typedef ProtocolDetectionState (*ProtocolDetectorCallback)(const char *id, const unsigned char *buffer, unsigned int bufferLength);
+	typedef bool (*ProtocolHandlerCallback)(const char *id, int socket, const sockaddr *address, unsigned int addressLength);
 	
 public:
 	virtual bool RegisterProtocolHandler(const char *id, ProtocolDetectorCallback detector, ProtocolHandlerCallback handler) = 0;

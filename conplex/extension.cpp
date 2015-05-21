@@ -94,7 +94,6 @@ struct PendingSocket
 	int socket;
 	sockaddr socketAddress;
 	socklen_t socketAddressLength;
-	netadr_t address;
 };
 
 CUtlVector<PendingSocket> pendingSockets;
@@ -133,7 +132,7 @@ struct CSocketCreator
 {
 	// These are our own functions, they're in here for convenient access to the engine's CSocketCreator variables.
 	void ProcessAccept();
-	void HandSocketToEngine(PendingSocket *pendingSocket);
+	void HandSocketToEngine(int socket, const sockaddr *socketAddress);
 
 	struct AcceptedSocket
 	{
@@ -147,6 +146,8 @@ struct CSocketCreator
 	int listenSocket;
 	netadr_t listenAddress;
 };
+
+CSocketCreator *socketCreator;
 
 void CSocketCreator::ProcessAccept()
 {
@@ -186,14 +187,16 @@ void CSocketCreator::ProcessAccept()
 	pendingSocket->socket = socket;
 	pendingSocket->socketAddress = socketAddress;
 	pendingSocket->socketAddressLength = socketAddressLength;
-	pendingSocket->address = address;
 }
 
-void CSocketCreator::HandSocketToEngine(PendingSocket *pendingSocket)
+void CSocketCreator::HandSocketToEngine(int socket, const sockaddr *socketAddress)
 {
+	netadr_t address;
+	address.SetFromSockadr(socketAddress);
+
 	AcceptedSocket *acceptedSocket = &acceptedSockets[acceptedSockets.AddToTail()];
-	acceptedSocket->socket = pendingSocket->socket;
-	acceptedSocket->address = pendingSocket->address;
+	acceptedSocket->socket = socket;
+	acceptedSocket->address = address;
 	acceptedSocket->data = NULL;
 
 	if (listener) {
@@ -215,10 +218,10 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		return DETOUR_MEMBER_CALL(ProcessAccept)();
 	}
 
-	CSocketCreator *creator = (CSocketCreator *)this;
+	socketCreator = (CSocketCreator *)this;
 
 	// Check for incoming sockets first.
-	creator->ProcessAccept();
+	socketCreator->ProcessAccept();
 
 	// Just enough to verify if it is RCON or HTTP(S).
 	unsigned char buffer[12] = {};
@@ -285,6 +288,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 
 		NameHashSet<ProtocolHandler>::Result httpHandler = protocolHandlers.find("HTTP");
 		NameHashSet<ProtocolHandler>::Result httpsHandler = protocolHandlers.find("HTTPS");
+		NameHashSet<ProtocolHandler>::Result rconHandler = protocolHandlers.find("RCon");
 
 		if (isHttp && httpHandler.found()) {
 			httpHandler->handler(httpHandler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
@@ -292,12 +296,14 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		} else if (isHttps && httpsHandler.found()) {
 			httpsHandler->handler(httpsHandler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
 			rootconsole->ConsolePrint("(%d) Gave HTTPS socket to web server.", pendingSocket->socket);
-		} else if (isRcon) {
-			creator->HandSocketToEngine(pendingSocket);
-			rootconsole->ConsolePrint("(%d) Gave RCON socket to engine.", pendingSocket->socket);
+		} else if (isRcon && rconHandler.found()) {
+			rconHandler->handler(rconHandler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
+			rootconsole->ConsolePrint("(%d) Gave RCon socket to engine.", pendingSocket->socket);
 		} else {
 			if (rconServer) {
-				rconServer->HandleFailedRconAuth(pendingSocket->address);
+				netadr_t address;
+				address.SetFromSockadr(&(pendingSocket->socketAddress));
+				rconServer->HandleFailedRconAuth(address);
 			}
 
 			rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.", pendingSocket->socket);
@@ -315,6 +321,21 @@ DETOUR_DECL_MEMBER0(RunFrame, void)
 	shouldHandleProcessAccept = true;
 	DETOUR_MEMBER_CALL(RunFrame)();
 	shouldHandleProcessAccept = false;
+}
+
+IConplex::ProtocolDetectionState ConplexRConDetector(const char *id, const unsigned char *buffer, unsigned int bufferLength)
+{
+	return IConplex::PD_NoMatch;
+}
+
+bool ConplexRConHandler(const char *id, int socket, const sockaddr *address, unsigned int addressLength)
+{
+	if (!socketCreator) {
+		return false;
+	}
+	
+	socketCreator->HandSocketToEngine(socket, address);
+	return true;
 }
 
 bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
@@ -355,6 +376,8 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	if (detourRunFrame) {
 		detourRunFrame->EnableDetour();
 	}
+	
+	RegisterProtocolHandler("RCon", ConplexRConDetector, ConplexRConHandler);
 
 	return true;
 }

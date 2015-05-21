@@ -583,23 +583,23 @@ void NotifyConnectionCallback(void *cls, MHD_Connection *connection, void **sock
 	}
 }
 
-IConplex::ProtocolDetectionState ConplexHTTPDetector(const char *id, int socket, const unsigned char *buffer, unsigned int bufferLength)
+IConplex::ProtocolDetectionState ConplexHTTPDetector(const char *id, const unsigned char *buffer, unsigned int bufferLength)
 {
 	return IConplex::PD_NoMatch;
 }
 
-bool ConplexHTTPHandler(const char *id, int socket, const void *address, unsigned int addressLength)
+bool ConplexHTTPHandler(const char *id, int socket, const sockaddr *address, unsigned int addressLength)
 {
-	MHD_add_connection(httpDaemon, socket, (const sockaddr *)address, addressLength);
+	MHD_add_connection(httpDaemon, socket, address, addressLength);
 	return true; // MHD will close the socket on failure.
 }
 
-IConplex::ProtocolDetectionState ConplexHTTPSDetector(const char *id, int socket, const unsigned char *buffer, unsigned int bufferLength)
+IConplex::ProtocolDetectionState ConplexHTTPSDetector(const char *id, const unsigned char *buffer, unsigned int bufferLength)
 {
 	return IConplex::PD_NoMatch;
 }
 
-bool ConplexHTTPSHandler(const char *id, int socket, const void *address, unsigned int addressLength)
+bool ConplexHTTPSHandler(const char *id, int socket, const sockaddr *address, unsigned int addressLength)
 {
 	// We don't actually handle HTTPS connections yet.
 	// Implementation will be the same as ConplexHTTPHandler apart from handing off to a dedicated HTTPS daemon.
