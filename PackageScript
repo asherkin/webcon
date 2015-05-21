@@ -29,15 +29,18 @@ def CopyFiles(src, dest, files):
     source_path = os.path.join(builder.sourcePath, src, source_file)
     builder.AddCopy(source_path, dest_entry)
 
-CopyFiles('', 'addons/sourcemod/gamedata', ['webcon.games.txt'])
-CopyFiles('', 'addons/sourcemod/scripting/include', ['webcon.inc'])
+CopyFiles('conplex', 'addons/sourcemod/gamedata', ['conplex.games.txt'])
 
-# Test Plugin
-CopyFiles('', 'addons/sourcemod/scripting', ['webcon.sp'])
+CopyFiles('conplex', 'addons/sourcemod/scripting/include', ['conplex.inc'])
+CopyFiles('webcon', 'addons/sourcemod/scripting/include', ['webcon.inc'])
+
+# Test Plugins
+CopyFiles('webcon', 'addons/sourcemod/scripting', ['webcon.sp'])
+CopyFiles('conplex', 'addons/sourcemod/scripting', ['conplex.sp'])
 
 # Scoreboard Plugin
-CopyFiles('scoreboard', 'addons/sourcemod/scripting', ['webscoreboard.sp'])
-CopyFiles('scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['index.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
+CopyFiles('samples/scoreboard', 'addons/sourcemod/scripting', ['webscoreboard.sp'])
+CopyFiles('samples/scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['index.html', 'background.jpg', 'classes.png', 'tf2.ttf'])
 
 # Manager Plugin
-CopyFiles('manager', 'addons/sourcemod/scripting', ['webmanager.sp'])
+CopyFiles('samples/manager', 'addons/sourcemod/scripting', ['webmanager.sp'])

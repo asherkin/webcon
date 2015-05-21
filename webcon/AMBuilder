@@ -6,16 +6,14 @@ libmicrohttpd = builder.RunScript('HTTPDBuilder')
 binary = builder.compiler.Library('webcon.ext')
 Webcon.ConfigureForExtension(builder, binary.compiler)
 
-binary.sources += [
-  os.path.join(builder.sourcePath, 'extension.cpp'),
-  os.path.join(Webcon.sm_root, 'public', 'smsdk_ext.cpp'),
-  os.path.join(Webcon.sm_root, 'public', 'CDetour', 'detours.cpp'),
-  os.path.join(Webcon.sm_root, 'public', 'asm', 'asm.c'),
+binary.compiler.includes += [
+  os.path.join(builder.sourcePath, 'conplex', 'public'),
+  os.path.join(builder.sourcePath, 'webcon', 'libmicrohttpd', 'include')
 ]
 
-binary.compiler.includes += [
-  os.path.join(builder.sourcePath, 'valve'),
-  os.path.join(builder.sourcePath, 'libmicrohttpd', 'include'),
+binary.sources += [
+  'extension.cpp',
+  os.path.join(Webcon.sm_root, 'public', 'smsdk_ext.cpp')
 ]
 
 binary.compiler.defines += ['SOURCEMOD_BUILD']

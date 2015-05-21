@@ -199,5 +199,5 @@ Webcon = WebconConfig()
 Webcon.detectSDKs()
 Webcon.configure()
 
-builder.RunBuildScripts('AMBuilder', { 'Webcon': Webcon })
+builder.RunBuildScripts(['conplex/AMBuilder', 'webcon/AMBuilder'], { 'Webcon': Webcon })
 builder.RunScript('PackageScript', { 'Webcon': Webcon })

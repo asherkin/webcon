@@ -1,13 +1,13 @@
 # vim: sts=2 ts=8 sw=2 tw=99 et ft=python: 
 import os, platform
 
-builder.SetBuildFolder('libmicrohttpd')
+builder.SetBuildFolder('webcon')
 
 binary = builder.compiler.StaticLibrary('microhttpd')
 
 binary.compiler.includes += [
-  os.path.join(builder.sourcePath, 'libmicrohttpd', 'microhttpd'),
-  os.path.join(builder.sourcePath, 'libmicrohttpd', 'include')
+  os.path.join(builder.sourcePath, 'webcon', 'libmicrohttpd', 'microhttpd'),
+  os.path.join(builder.sourcePath, 'webcon', 'libmicrohttpd', 'include')
 ]
 
 binary.sources += [
@@ -27,7 +27,7 @@ binary.sources += [
 
 if builder.target_platform == 'windows':
   binary.sources += [
-    'libmicrohttpd/platform/w32functions.c',
+    'libmicrohttpd/platform/w32functions.c'
   ]
 
 rvalue = builder.Add(binary)

@@ -1,0 +1,23 @@
+# vim: set sts=2 ts=8 sw=2 tw=99 et ft=python:
+import os
+
+binary = builder.compiler.Library('conplex.ext')
+Webcon.ConfigureForExtension(builder, binary.compiler)
+
+binary.compiler.includes += [
+  os.path.join(builder.sourcePath, 'conplex', 'valve'),
+]
+
+binary.sources += [
+  'extension.cpp',
+  os.path.join(Webcon.sm_root, 'public', 'smsdk_ext.cpp'),
+  os.path.join(Webcon.sm_root, 'public', 'CDetour', 'detours.cpp'),
+  os.path.join(Webcon.sm_root, 'public', 'asm', 'asm.c'),
+]
+
+binary.compiler.defines += ['SOURCEMOD_BUILD']
+
+if builder.target_platform == 'windows':
+  binary.compiler.linkflags += ['ws2_32.lib']
+
+Webcon.extensions += [builder.Add(binary)]
