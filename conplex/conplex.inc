@@ -3,6 +3,12 @@
 #endif
 #define _conplex_included
 
+methodmap ConplexSocket < Handle
+{
+	public native int Send(const char[] data, int length, int flags);
+	public native int Receive(char[] buffer, int length, int flags);
+}
+
 enum ConplexProtocolDetectionState
 {
 	ConplexProtocolDetection_NoMatch,
@@ -11,8 +17,9 @@ enum ConplexProtocolDetectionState
 }
 
 typedef ConplexProtocolDetector = function ConplexProtocolDetectionState (const char[] id, const char[] data, int length);
-typedef ConplexProtocolHandler = function bool (const char[] id, int socket, const char[] address);
+typedef ConplexProtocolHandler = function bool (const char[] id, ConplexSocket socket, const char[] address);
 
+#pragma deprecated This interface should only be used for prototyping. Write production handlers in C++ please.
 native bool Conplex_RegisterProtocol(const char[] id, ConplexProtocolDetector detector, ConplexProtocolHandler handler);
 
 public Extension __ext_Conplex = 

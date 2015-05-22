@@ -8,6 +8,7 @@
 #include <io.h>
 #include <Winsock2.h>
 #include <Ws2tcpip.h>
+#define MSG_NOSIGNAL 0
 #else
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -39,6 +40,20 @@ bool shouldHandleProcessAccept;
 
 CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
+
+HandleType_t handleTypeSocket;
+
+struct SocketTypeHandler: public IHandleTypeDispatch
+{
+	void OnHandleDestroy(HandleType_t type, void *object);
+};
+
+SocketTypeHandler handlerSocketType;
+
+void SocketTypeHandler::OnHandleDestroy(HandleType_t type, void *object)
+{
+	closesocket((int)object);
+}
 
 class ProtocolHandler
 {
@@ -72,6 +87,7 @@ public:
 private:
 	char *id;
 	ProtocolHandlerType type;
+	IdentityToken_t *owner;
 	
 	union {
 		IConplex::ProtocolDetectorCallback extension;
@@ -93,6 +109,7 @@ ProtocolHandler::ProtocolHandler(const char *id, IConplex::ProtocolDetectorCallb
 {
 	this->id = strdup(id);
 	this->type = Extension;
+	this->owner = NULL; // TODO: Pass this is.
 	this->detector.extension = detector;
 	this->handler.extension = handler;
 }
@@ -101,6 +118,7 @@ ProtocolHandler::ProtocolHandler(const char *id, IPluginContext *context, funcid
 {
 	this->id = strdup(id);
 	this->type = Plugin;
+	this->owner = context->GetIdentity();
 	
 	this->detector.plugin = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_String, Param_String, Param_Cell);
 	this->detector.plugin->AddFunction(context, detector);
@@ -113,6 +131,7 @@ ProtocolHandler::ProtocolHandler(ke::Moveable<ProtocolHandler> other)
 {
 	id = other->id;
 	type = other->type;
+	owner = other->owner;
 	detector = other->detector;
 	handler = other->handler;
 
@@ -173,7 +192,7 @@ bool ProtocolHandler::ExecuteHandler(int socket, const sockaddr *address, unsign
 	
 	if (this->type == Plugin && handler.plugin) {
 		handler.plugin->PushString(id);
-		handler.plugin->PushCell(socket);
+		handler.plugin->PushCell(handlesys->CreateHandle(handleTypeSocket, (void *)socket, owner, myself->GetIdentity(), NULL));
 		handler.plugin->PushString(""); // TODO: inet_ntoa
 	
 		cell_t result = 0;
@@ -463,6 +482,54 @@ bool ConplexRConHandler(const char *id, int socket, const sockaddr *address, uns
 	return true;
 }
 
+cell_t ConplexSocket_Send(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	int socket;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeSocket, &security, (void **)&socket);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid socket handle %x (error %d)", params[1], error);
+	}
+
+	char *data = NULL;
+	context->LocalToString(params[2], &data);
+
+	ssize_t ret = send(socket, data, params[3], params[4] | MSG_NOSIGNAL);
+	
+	if (ret == -1 && SocketWouldBlock()) {
+		return -2;
+	}
+	
+	return ret;
+}
+
+cell_t ConplexSocket_Receive(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	int socket;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeSocket, &security, (void **)&socket);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid socket handle %x (error %d)", params[1], error);
+	}
+
+	char *data = NULL;
+	context->LocalToString(params[2], &data);
+
+	ssize_t ret = recv(socket, data, params[3], params[4]);
+	
+	if (ret == -1 && SocketWouldBlock()) {
+		return -2;
+	}
+	
+	return ret;
+}
+
 cell_t Conplex_RegisterProtocol(IPluginContext *context, const cell_t *params)
 {
 	char *id = NULL;
@@ -489,6 +556,8 @@ cell_t Conplex_RegisterProtocol(IPluginContext *context, const cell_t *params)
 }
 
 sp_nativeinfo_t natives[] = {
+	{"ConplexSocket.Send", ConplexSocket_Send},
+	{"ConplexSocket.Receive", ConplexSocket_Receive},
 	{"Conplex_RegisterProtocol", Conplex_RegisterProtocol},
 	{NULL, NULL}
 };
@@ -531,6 +600,8 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	if (detourRunFrame) {
 		detourRunFrame->EnableDetour();
 	}
+	
+	handleTypeSocket = handlesys->CreateType("ConplexSocket", &handlerSocketType, 0, NULL, NULL, myself->GetIdentity(), NULL);
 
 	sharesys->AddNatives(myself, natives);
 	
@@ -541,6 +612,8 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 void Conplex::SDK_OnUnload()
 {
+	handlesys->RemoveType(handleTypeSocket, myself->GetIdentity());
+	
 	if (detourRunFrame) {
 		detourRunFrame->DisableDetour();
 	}
