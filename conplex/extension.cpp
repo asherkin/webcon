@@ -353,19 +353,33 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		{
 			// TODO: Don't call handlers that have returned NoMatch already on a previous call for this connection.
 			for (NameHashSet<ProtocolHandler>::iterator i = protocolHandlers.iter(); !i.empty(); i.next()) {
+				if (!i->IsAlive()) {
+					i.erase();
+					continue;
+				}
+			
 				IConplex::ProtocolDetectionState state = i->ExecuteDetector(buffer, ret);
 				rootconsole->ConsolePrint(">>> %s = %d %d", i->GetId(), ret, state);
 				
 				if (state == IConplex::Match) {
 					handler = &(*i);
+					pendingCount = 0;
 					break;
 				}
 				
 				if (state == IConplex::NeedMoreData) {
+					if (!handler) {
+						handler = &(*i);
+					}
+				
 					pendingCount++;
 					continue;
 				}
 			}
+		}
+		
+		if (pendingCount > 1) {
+			handler = NULL;
 		}
 
 		if (!handler) {
