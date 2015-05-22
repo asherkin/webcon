@@ -152,12 +152,12 @@ IConplex::ProtocolDetectionState ProtocolHandler::ExecuteDetector(const unsigned
 	}
 	
 	if (this->type == Plugin && detector.plugin) {
-		handler.plugin->PushString(id);
-		handler.plugin->PushStringEx((char *)buffer, bufferLength, SM_PARAM_STRING_COPY | SM_PARAM_STRING_BINARY, 0);
-		handler.plugin->PushCell(bufferLength);
+		detector.plugin->PushString(id);
+		detector.plugin->PushStringEx((char *)buffer, bufferLength, SM_PARAM_STRING_COPY | SM_PARAM_STRING_BINARY, 0);
+		detector.plugin->PushCell(bufferLength);
 	
 		cell_t result = 0;
-		handler.plugin->Execute(&result);
+		detector.plugin->Execute(&result);
 		
 		return (IConplex::ProtocolDetectionState)result;
 	}
