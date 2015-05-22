@@ -59,6 +59,7 @@ public:
 	
 public:
 	const char *GetId() const;
+	bool IsAlive() const;
 	IConplex::ProtocolDetectionState ExecuteDetector(const unsigned char *buffer, unsigned int bufferLength) const;
 	bool ExecuteHandler(int socket, const sockaddr *address, unsigned int addressLength) const;
 	
@@ -132,6 +133,16 @@ ProtocolHandler::~ProtocolHandler()
 const char *ProtocolHandler::GetId() const
 {
 	return id;
+}
+
+bool ProtocolHandler::IsAlive() const
+{
+	if (this->type == Plugin) {
+		if (detector.plugin && detector.plugin->GetFunctionCount() <= 0) return false;
+		if (handler.plugin && handler.plugin->GetFunctionCount() <= 0) return false;
+	}
+	
+	return true;
 }
 
 IConplex::ProtocolDetectionState ProtocolHandler::ExecuteDetector(const unsigned char *buffer, unsigned int bufferLength) const
@@ -438,6 +449,36 @@ bool ConplexRConHandler(const char *id, int socket, const sockaddr *address, uns
 	return true;
 }
 
+cell_t Conplex_RegisterProtocol(IPluginContext *context, const cell_t *params)
+{
+	char *id = NULL;
+	context->LocalToString(params[1], &id);
+	if (id[0] == '\0') {
+		return 0;
+	}
+
+	NameHashSet<ProtocolHandler>::Insert i = protocolHandlers.findForAdd(id);
+
+	if (i.found()) {
+		if (i->IsAlive()) {
+			return 0;
+		}
+
+		protocolHandlers.remove(i);
+		i = protocolHandlers.findForAdd(id);
+	}
+
+	ProtocolHandler ph(id, context, params[2], params[3]);
+	protocolHandlers.add(i, ke::Moveable<ProtocolHandler>(ph));
+
+	return 1;
+}
+
+sp_nativeinfo_t natives[] = {
+	{"Conplex_RegisterProtocol", Conplex_RegisterProtocol},
+	{NULL, NULL}
+};
+
 bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	if (!sharesys->AddInterface(myself, this))
@@ -476,6 +517,8 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	if (detourRunFrame) {
 		detourRunFrame->EnableDetour();
 	}
+
+	sharesys->AddNatives(myself, natives);
 	
 	RegisterProtocolHandler("RCon", ConplexRConDetector, ConplexRConHandler);
 
@@ -508,7 +551,12 @@ bool Conplex::RegisterProtocolHandler(const char *id, ProtocolDetectorCallback d
 	NameHashSet<ProtocolHandler>::Insert i = protocolHandlers.findForAdd(id);
 
 	if (i.found()) {
-		return false;
+		if (i->IsAlive()) {
+			return false;
+		}
+
+		protocolHandlers.remove(i);
+		i = protocolHandlers.findForAdd(id);
 	}
 
 	ProtocolHandler ph(id, detector, handler);
