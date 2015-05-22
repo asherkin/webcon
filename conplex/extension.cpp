@@ -40,11 +40,13 @@ bool shouldHandleProcessAccept;
 CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
 
-struct ProtocolHandler
+class ProtocolHandler
 {
+public:
 	static bool matches(const char *key, const ProtocolHandler &value);
 
 	ProtocolHandler(const char *id, IConplex::ProtocolDetectorCallback detector, IConplex::ProtocolHandlerCallback handler);
+	ProtocolHandler(const char *id, IPluginContext *context, funcid_t detector, funcid_t handler);
 	~ProtocolHandler();
 
 	// TODO: Once we update to a version of SM with modern AMTL,
@@ -54,10 +56,31 @@ struct ProtocolHandler
 
 	ProtocolHandler(ProtocolHandler const &other) = delete;
 	ProtocolHandler &operator =(ProtocolHandler const &other) = delete;
-
+	
+public:
+	const char *GetId() const;
+	IConplex::ProtocolDetectionState ExecuteDetector(const unsigned char *buffer, unsigned int bufferLength) const;
+	bool ExecuteHandler(int socket, const sockaddr *address, unsigned int addressLength) const;
+	
+	enum ProtocolHandlerType {
+		Invalid,
+		Extension,
+		Plugin,
+	};
+	
+private:
 	char *id;
-	IConplex::ProtocolDetectorCallback detector;
-	IConplex::ProtocolHandlerCallback handler;
+	ProtocolHandlerType type;
+	
+	union {
+		IConplex::ProtocolDetectorCallback extension;
+		IChangeableForward *plugin;
+	} detector;
+	
+	union {
+		IConplex::ProtocolHandlerCallback extension;
+		IChangeableForward *plugin;
+	} handler;
 };
 
 bool ProtocolHandler::matches(const char *key, const ProtocolHandler &value)
@@ -68,22 +91,87 @@ bool ProtocolHandler::matches(const char *key, const ProtocolHandler &value)
 ProtocolHandler::ProtocolHandler(const char *id, IConplex::ProtocolDetectorCallback detector, IConplex::ProtocolHandlerCallback handler)
 {
 	this->id = strdup(id);
-	this->detector = detector;
-	this->handler = handler;
+	this->type = Extension;
+	this->detector.extension = detector;
+	this->handler.extension = handler;
+}
+
+ProtocolHandler::ProtocolHandler(const char *id, IPluginContext *context, funcid_t detector, funcid_t handler)
+{
+	this->id = strdup(id);
+	this->type = Plugin;
+	
+	this->detector.plugin = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_String, Param_String, Param_Cell);
+	this->detector.plugin->AddFunction(context, detector);
+	
+	this->handler.plugin = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_String, Param_Cell, Param_String);
+	this->handler.plugin->AddFunction(context, handler);
 }
 
 ProtocolHandler::ProtocolHandler(ke::Moveable<ProtocolHandler> other)
 {
 	id = other->id;
+	type = other->type;
 	detector = other->detector;
 	handler = other->handler;
 
 	other->id = NULL;
+	other->type = Invalid;
 }
 
 ProtocolHandler::~ProtocolHandler()
 {
 	free(id);
+	
+	if (this->type == Plugin) {
+		if (detector.plugin) forwards->ReleaseForward(detector.plugin);
+		if (handler.plugin) forwards->ReleaseForward(handler.plugin);
+	}
+}
+
+const char *ProtocolHandler::GetId() const
+{
+	return id;
+}
+
+IConplex::ProtocolDetectionState ProtocolHandler::ExecuteDetector(const unsigned char *buffer, unsigned int bufferLength) const
+{
+	if (this->type == Extension && detector.extension) {
+		return detector.extension(id, buffer, bufferLength);
+	}
+	
+	if (this->type == Plugin && detector.plugin) {
+		handler.plugin->PushString(id);
+		handler.plugin->PushStringEx((char *)buffer, bufferLength, SM_PARAM_STRING_COPY | SM_PARAM_STRING_BINARY, 0);
+		handler.plugin->PushCell(bufferLength);
+	
+		cell_t result = 0;
+		handler.plugin->Execute(&result);
+		
+		return (IConplex::ProtocolDetectionState)result;
+	}
+	
+	return IConplex::NoMatch;
+}
+
+bool ProtocolHandler::ExecuteHandler(int socket, const sockaddr *address, unsigned int addressLength) const
+{
+	if (this->type == Extension && handler.extension) {
+		return handler.extension(id, socket, address, addressLength);
+	}
+	
+	if (this->type == Plugin && handler.plugin) {
+		handler.plugin->PushString(id);
+		handler.plugin->PushCell(socket);
+		handler.plugin->PushString(""); // TODO: inet_ntoa
+	
+		cell_t result = 0;
+		handler.plugin->Execute(&result);
+		
+		return (result != 0);
+	}
+	
+	return false;
 }
 
 NameHashSet<ProtocolHandler> protocolHandlers;
@@ -254,8 +342,8 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		{
 			// TODO: Don't call handlers that have returned NoMatch already on a previous call for this connection.
 			for (NameHashSet<ProtocolHandler>::iterator i = protocolHandlers.iter(); !i.empty(); i.next()) {
-				IConplex::ProtocolDetectionState state = i->detector(i->id, buffer, ret);
-				rootconsole->ConsolePrint(">>> %s = %d %d", i->id, ret, state);
+				IConplex::ProtocolDetectionState state = i->ExecuteDetector(buffer, ret);
+				rootconsole->ConsolePrint(">>> %s = %d %d", i->GetId(), ret, state);
 				
 				if (state == IConplex::Match) {
 					handler = &(*i);
@@ -290,7 +378,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			// About 15 seconds.
 			if (pendingSocket->timeout > 1000) {
 				if (rconServer) {
-					// TODO: We need logic to exclude clients connected to the HTTP server.
+					// Unfortunately Chrome opens a number of extra connections without sending any data.
 					//rconServer->HandleFailedRconAuth(pendingSocket->address);
 				}
 
@@ -303,10 +391,10 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			continue;
 		}
 
-		if (handler->handler(handler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength)) {
-			rootconsole->ConsolePrint("(%d) Gave %s socket to handler.", pendingSocket->socket, handler->id);
+		if (handler->ExecuteHandler(pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength)) {
+			rootconsole->ConsolePrint("(%d) Gave %s socket to handler.", pendingSocket->socket, handler->GetId());
 		} else {
-			rootconsole->ConsolePrint("(%d) %s handler rejected socket.", pendingSocket->socket, handler->id);
+			rootconsole->ConsolePrint("(%d) %s handler rejected socket.", pendingSocket->socket, handler->GetId());
 			closesocket(pendingSocket->socket);
 		}
 		
