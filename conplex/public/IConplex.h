@@ -16,10 +16,9 @@ public:
 
 public:
 	enum ProtocolDetectionState {
-		PD_CertainMatch,
-		PD_PotentialMatch,
-		PD_NeedMoreData,
-		PD_NoMatch,
+		NoMatch,
+		NeedMoreData,
+		Match,
 	};
 
 	typedef ProtocolDetectionState (*ProtocolDetectorCallback)(const char *id, const unsigned char *buffer, unsigned int bufferLength);

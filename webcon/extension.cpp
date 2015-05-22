@@ -387,7 +387,7 @@ sp_nativeinfo_t natives[] = {
 
 int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-	if (url[0] == '\0') {
+	if (url[0] != '/') {
 		return MHD_NO;
 	}
 
@@ -406,7 +406,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 		}
 	}
 
-	if (strcmp(url, "/") == 0) {
+	if (url[1] == '\0') {
 		size_t length = 51;
 		char *buffer = (char *)malloc(length + 1);
 		if (!buffer) {
@@ -464,10 +464,6 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 	}
 
 	const char *id = url + 1;
-	if (id[0] == '\0') {
-		return MHD_NO;
-	}
-
 	const char *path = "/";
 	const char *end = strchr(id, '/');
 	char *buffer = NULL;
@@ -585,7 +581,25 @@ void NotifyConnectionCallback(void *cls, MHD_Connection *connection, void **sock
 
 IConplex::ProtocolDetectionState ConplexHTTPDetector(const char *id, const unsigned char *buffer, unsigned int bufferLength)
 {
-	return IConplex::PD_NoMatch;
+	bool hasSpace = false;
+	bool hasSlash = false;
+	for (unsigned int i = 0; i < bufferLength; ++i) {
+		if (hasSpace) {
+			hasSlash = (buffer[i] == '/');
+			return hasSlash ? IConplex::Match : IConplex::NoMatch;
+		}
+		
+		hasSpace = (i >= 3) && (buffer[i] == ' ');
+		if (hasSpace) {
+			continue;
+		}
+		
+		if (buffer[i] < 'A' || buffer[i] > 'Z') {
+			return IConplex::NoMatch;
+		}
+	}
+	
+	return IConplex::NeedMoreData;
 }
 
 bool ConplexHTTPHandler(const char *id, int socket, const sockaddr *address, unsigned int addressLength)
@@ -596,7 +610,17 @@ bool ConplexHTTPHandler(const char *id, int socket, const sockaddr *address, uns
 
 IConplex::ProtocolDetectionState ConplexHTTPSDetector(const char *id, const unsigned char *buffer, unsigned int bufferLength)
 {
-	return IConplex::PD_NoMatch;
+	if (bufferLength <= 0) return IConplex::NeedMoreData;
+	if (buffer[0] != 0x16) return IConplex::NoMatch;
+	if (bufferLength <= 1) return IConplex::NeedMoreData;
+	if (buffer[1] != 0x03) return IConplex::NoMatch;
+	if (bufferLength <= 5) return IConplex::NeedMoreData;
+	if (buffer[5] != 0x01) return IConplex::NoMatch;
+	if (bufferLength <= 6) return IConplex::NeedMoreData;
+	if (buffer[6] != 0x00) return IConplex::NoMatch;
+	if (bufferLength <= 8) return IConplex::NeedMoreData;
+	if (((buffer[3] * 256) + buffer[4]) != ((buffer[7] * 256) + buffer[8] + 4)) return IConplex::NoMatch;
+	return IConplex::Match;
 }
 
 bool ConplexHTTPSHandler(const char *id, int socket, const sockaddr *address, unsigned int addressLength)

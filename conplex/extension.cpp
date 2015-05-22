@@ -223,8 +223,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 	// Check for incoming sockets first.
 	socketCreator->ProcessAccept();
 
-	// Just enough to verify if it is RCON or HTTP(S).
-	unsigned char buffer[12] = {};
+	unsigned char buffer[32] = {};
 
 	int count = pendingSockets.Count();
 	for (int i = (count - 1); i >= 0; --i) {
@@ -247,9 +246,45 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			pendingSockets.Remove(i);
 			continue;
 		}
+		
+		int pendingCount = 0;
+		const ProtocolHandler *handler = NULL;
+		
+		if (ret > 0)
+		{
+			// TODO: Don't call handlers that have returned NoMatch already on a previous call for this connection.
+			for (NameHashSet<ProtocolHandler>::iterator i = protocolHandlers.iter(); !i.empty(); i.next()) {
+				IConplex::ProtocolDetectionState state = i->detector(i->id, buffer, ret);
+				rootconsole->ConsolePrint(">>> %s = %d %d", i->id, ret, state);
+				
+				if (state == IConplex::Match) {
+					handler = &(*i);
+					break;
+				}
+				
+				if (state == IConplex::NeedMoreData) {
+					pendingCount++;
+					continue;
+				}
+			}
+		}
 
-		// We need at least n bytes to identify packets.
-		if (ret < (ssize_t)sizeof(buffer)) {
+		if (!handler) {
+			// Ran out of handlers or data.
+			if ((ret > 0 && pendingCount == 0) || ret == sizeof(buffer)) {
+				if (rconServer) {
+					netadr_t address;
+					address.SetFromSockadr(&(pendingSocket->socketAddress));
+					rconServer->HandleFailedRconAuth(address);
+				}
+
+				rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.", pendingSocket->socket);
+				closesocket(pendingSocket->socket);
+
+				pendingSockets.Remove(i);
+				continue;
+			}
+		
 			pendingSocket->timeout++;
 
 			// About 15 seconds.
@@ -268,48 +303,13 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			continue;
 		}
 
-#if 0
-		META_CONPRINTF("(%d) Packet Header:", pendingSocket->socket);
-		for (unsigned j = 0; j < sizeof(buffer); ++j) {
-			META_CONPRINTF(" %02X", buffer[j]);
-		}
-		META_CONPRINTF("\n");
-#endif
-
-		bool isHttp = ((buffer[0] >= 'A' && buffer[0] <= 'Z') || (buffer[0] >= 'a' && buffer[0] <= 'z')) &&
-		              ((buffer[1] >= 'A' && buffer[1] <= 'Z') || (buffer[1] >= 'a' && buffer[1] <= 'z')) &&
-		              ((buffer[2] >= 'A' && buffer[2] <= 'Z') || (buffer[2] >= 'a' && buffer[2] <= 'z'));
-
-		bool isHttps = buffer[0] == 0x16 && buffer[1] == 0x03 && buffer[5] == 0x01 && buffer[6] == 0x00 &&
-		               ((buffer[3] * 256) + buffer[4]) == ((buffer[7] * 256) + buffer[8] + 4);
-
-		bool isRcon = buffer[2] == 0x00 && buffer[3] == 0x00 &&
-		              (buffer[8] == 0x03 && buffer[9] == 0x00 && buffer[10] == 0x00 && buffer[11] == 0x00);
-
-		NameHashSet<ProtocolHandler>::Result httpHandler = protocolHandlers.find("HTTP");
-		NameHashSet<ProtocolHandler>::Result httpsHandler = protocolHandlers.find("HTTPS");
-		NameHashSet<ProtocolHandler>::Result rconHandler = protocolHandlers.find("RCon");
-
-		if (isHttp && httpHandler.found()) {
-			httpHandler->handler(httpHandler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
-			rootconsole->ConsolePrint("(%d) Gave HTTP socket to web server.", pendingSocket->socket);
-		} else if (isHttps && httpsHandler.found()) {
-			httpsHandler->handler(httpsHandler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
-			rootconsole->ConsolePrint("(%d) Gave HTTPS socket to web server.", pendingSocket->socket);
-		} else if (isRcon && rconHandler.found()) {
-			rconHandler->handler(rconHandler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength);
-			rootconsole->ConsolePrint("(%d) Gave RCon socket to engine.", pendingSocket->socket);
+		if (handler->handler(handler->id, pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength)) {
+			rootconsole->ConsolePrint("(%d) Gave %s socket to handler.", pendingSocket->socket, handler->id);
 		} else {
-			if (rconServer) {
-				netadr_t address;
-				address.SetFromSockadr(&(pendingSocket->socketAddress));
-				rconServer->HandleFailedRconAuth(address);
-			}
-
-			rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.", pendingSocket->socket);
+			rootconsole->ConsolePrint("(%d) %s handler rejected socket.", pendingSocket->socket, handler->id);
 			closesocket(pendingSocket->socket);
 		}
-
+		
 		pendingSockets.Remove(i);
 	}
 }
@@ -325,7 +325,19 @@ DETOUR_DECL_MEMBER0(RunFrame, void)
 
 IConplex::ProtocolDetectionState ConplexRConDetector(const char *id, const unsigned char *buffer, unsigned int bufferLength)
 {
-	return IConplex::PD_NoMatch;
+	if (bufferLength <= 2) return IConplex::NeedMoreData;
+	if (buffer[2] != 0x00) return IConplex::NoMatch;
+	if (bufferLength <= 3) return IConplex::NeedMoreData;
+	if (buffer[3] != 0x00) return IConplex::NoMatch;
+	if (bufferLength <= 8) return IConplex::NeedMoreData;
+	if (buffer[8] != 0x03) return IConplex::NoMatch;
+	if (bufferLength <= 9) return IConplex::NeedMoreData;
+	if (buffer[9] != 0x00) return IConplex::NoMatch;
+	if (bufferLength <= 10) return IConplex::NeedMoreData;
+	if (buffer[10] != 0x00) return IConplex::NoMatch;
+	if (bufferLength <= 11) return IConplex::NeedMoreData;
+	if (buffer[11] != 0x00) return IConplex::NoMatch;
+	return IConplex::Match;
 }
 
 bool ConplexRConHandler(const char *id, int socket, const sockaddr *address, unsigned int addressLength)
