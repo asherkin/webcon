@@ -7,6 +7,11 @@ methodmap ConplexSocket < Handle
 {
 	public native int Send(const char[] data, int length, int flags);
 	public native int Receive(char[] buffer, int length, int flags);
+
+	property any Context {
+		public native get();
+		public native set(any value);
+	}
 }
 
 enum ConplexProtocolDetectionState

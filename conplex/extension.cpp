@@ -41,6 +41,23 @@ bool shouldHandleProcessAccept;
 CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
 
+struct ConplexSocket {
+	ConplexSocket(int socket);
+	~ConplexSocket();
+
+	int socket;
+	cell_t context;
+};
+
+ConplexSocket::ConplexSocket(int socket)
+	:socket(socket), context(0)
+{}
+
+ConplexSocket::~ConplexSocket()
+{
+	closesocket(socket);
+}
+
 HandleType_t handleTypeSocket;
 
 struct SocketTypeHandler: public IHandleTypeDispatch
@@ -52,7 +69,7 @@ SocketTypeHandler handlerSocketType;
 
 void SocketTypeHandler::OnHandleDestroy(HandleType_t type, void *object)
 {
-	closesocket((int)object);
+	delete (ConplexSocket *)object;
 }
 
 class ProtocolHandler
@@ -192,7 +209,7 @@ bool ProtocolHandler::ExecuteHandler(int socket, const sockaddr *address, unsign
 	
 	if (this->type == Plugin && handler.plugin) {
 		handler.plugin->PushString(id);
-		handler.plugin->PushCell(handlesys->CreateHandle(handleTypeSocket, (void *)socket, owner, myself->GetIdentity(), NULL));
+		handler.plugin->PushCell(handlesys->CreateHandle(handleTypeSocket, new ConplexSocket(socket), owner, myself->GetIdentity(), NULL));
 		handler.plugin->PushString(""); // TODO: inet_ntoa
 	
 		cell_t result = 0;
@@ -488,7 +505,7 @@ cell_t ConplexSocket_Send(IPluginContext *context, const cell_t *params)
 	security.pOwner = context->GetIdentity();
 	security.pIdentity = myself->GetIdentity();
 
-	int socket;
+	ConplexSocket *socket;
 	HandleError error = handlesys->ReadHandle(params[1], handleTypeSocket, &security, (void **)&socket);
 	if (error != HandleError_None) {
 		return context->ThrowNativeError("Invalid socket handle %x (error %d)", params[1], error);
@@ -497,7 +514,7 @@ cell_t ConplexSocket_Send(IPluginContext *context, const cell_t *params)
 	char *data = NULL;
 	context->LocalToString(params[2], &data);
 
-	ssize_t ret = send(socket, data, params[3], params[4] | MSG_NOSIGNAL);
+	ssize_t ret = send(socket->socket, data, params[3], params[4] | MSG_NOSIGNAL);
 	
 	if (ret == -1 && SocketWouldBlock()) {
 		return -2;
@@ -512,7 +529,7 @@ cell_t ConplexSocket_Receive(IPluginContext *context, const cell_t *params)
 	security.pOwner = context->GetIdentity();
 	security.pIdentity = myself->GetIdentity();
 
-	int socket;
+	ConplexSocket *socket;
 	HandleError error = handlesys->ReadHandle(params[1], handleTypeSocket, &security, (void **)&socket);
 	if (error != HandleError_None) {
 		return context->ThrowNativeError("Invalid socket handle %x (error %d)", params[1], error);
@@ -521,13 +538,45 @@ cell_t ConplexSocket_Receive(IPluginContext *context, const cell_t *params)
 	char *data = NULL;
 	context->LocalToString(params[2], &data);
 
-	ssize_t ret = recv(socket, data, params[3], params[4]);
+	ssize_t ret = recv(socket->socket, data, params[3], params[4]);
 	
 	if (ret == -1 && SocketWouldBlock()) {
 		return -2;
 	}
 	
 	return ret;
+}
+
+cell_t ConplexSocket_Context_get(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	ConplexSocket *socket;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeSocket, &security, (void **)&socket);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid socket handle %x (error %d)", params[1], error);
+	}
+
+	return socket->context;
+}
+
+cell_t ConplexSocket_Context_set(IPluginContext *context, const cell_t *params)
+{
+	HandleSecurity security;
+	security.pOwner = context->GetIdentity();
+	security.pIdentity = myself->GetIdentity();
+
+	ConplexSocket *socket;
+	HandleError error = handlesys->ReadHandle(params[1], handleTypeSocket, &security, (void **)&socket);
+	if (error != HandleError_None) {
+		return context->ThrowNativeError("Invalid socket handle %x (error %d)", params[1], error);
+	}
+
+	socket->context = params[2];
+
+	return 1;
 }
 
 cell_t Conplex_RegisterProtocol(IPluginContext *context, const cell_t *params)
@@ -558,6 +607,8 @@ cell_t Conplex_RegisterProtocol(IPluginContext *context, const cell_t *params)
 sp_nativeinfo_t natives[] = {
 	{"ConplexSocket.Send", ConplexSocket_Send},
 	{"ConplexSocket.Receive", ConplexSocket_Receive},
+	{"ConplexSocket.Context.get", ConplexSocket_Context_get},
+	{"ConplexSocket.Context.set", ConplexSocket_Context_set},
 	{"Conplex_RegisterProtocol", Conplex_RegisterProtocol},
 	{NULL, NULL}
 };
