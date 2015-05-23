@@ -413,7 +413,7 @@ int DefaultConnectionHandler(void *cls, MHD_Connection *connection, const char *
 			return MHD_NO;
 		}
 
-		int cursor = 0;
+		size_t cursor = 0;
 		cursor += sprintf(buffer, "<!DOCTYPE html>\n<html><body><dl>");
 
 		for (NameHashSet<PluginRequestHandler>::iterator i = requestHandlers.iter(); !i.empty(); i.next()) {

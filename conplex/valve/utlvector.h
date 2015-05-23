@@ -20,10 +20,12 @@
 #else
 #include <malloc.h>
 #endif
+
 #ifdef _MSC_VER
 #include <new.h>
 #elif defined __GNUC__
 #include <new>
+#define __cdecl
 #endif
 
 template <class T>
