@@ -27,7 +27,7 @@ typedef ConplexProtocolHandler = function bool (const char[] id, ConplexSocket s
 #pragma deprecated This interface should only be used for prototyping. Write production handlers in C++ please.
 native bool Conplex_RegisterProtocol(const char[] id, ConplexProtocolDetector detector, ConplexProtocolHandler handler);
 
-public Extension __ext_Conplex = 
+public Extension __ext_Conplex =
 {
 	name = "Conplex",
 	file = "conplex.ext",

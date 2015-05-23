@@ -94,29 +94,29 @@ public:
 
 	ProtocolHandler(ProtocolHandler const &other) = delete;
 	ProtocolHandler &operator =(ProtocolHandler const &other) = delete;
-	
+
 public:
 	const char *GetId() const;
 	bool IsAlive() const;
 	IConplex::ProtocolDetectionState ExecuteDetector(const unsigned char *buffer, unsigned int bufferLength) const;
 	bool ExecuteHandler(int socket, const sockaddr *address, unsigned int addressLength) const;
-	
+
 	enum ProtocolHandlerType {
 		Invalid,
 		Extension,
 		Plugin,
 	};
-	
+
 private:
 	char *id;
 	ProtocolHandlerType type;
 	IdentityToken_t *owner;
-	
+
 	union {
 		IConplex::ProtocolDetectorCallback extension;
 		IChangeableForward *plugin;
 	} detector;
-	
+
 	union {
 		IConplex::ProtocolHandlerCallback extension;
 		IChangeableForward *plugin;
@@ -142,10 +142,10 @@ ProtocolHandler::ProtocolHandler(const char *id, IPluginContext *context, funcid
 	this->id = strdup(id);
 	this->type = Plugin;
 	this->owner = context->GetIdentity();
-	
+
 	this->detector.plugin = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_String, Param_String, Param_Cell);
 	this->detector.plugin->AddFunction(context, detector);
-	
+
 	this->handler.plugin = forwards->CreateForwardEx(NULL, ET_Single, 3, NULL, Param_String, Param_Cell, Param_String);
 	this->handler.plugin->AddFunction(context, handler);
 }
@@ -165,7 +165,7 @@ ProtocolHandler::ProtocolHandler(ke::Moveable<ProtocolHandler> other)
 ProtocolHandler::~ProtocolHandler()
 {
 	free(id);
-	
+
 	if (this->type == Plugin) {
 		if (detector.plugin) forwards->ReleaseForward(detector.plugin);
 		if (handler.plugin) forwards->ReleaseForward(handler.plugin);
@@ -183,7 +183,7 @@ bool ProtocolHandler::IsAlive() const
 		if (detector.plugin && detector.plugin->GetFunctionCount() <= 0) return false;
 		if (handler.plugin && handler.plugin->GetFunctionCount() <= 0) return false;
 	}
-	
+
 	return true;
 }
 
@@ -192,18 +192,18 @@ IConplex::ProtocolDetectionState ProtocolHandler::ExecuteDetector(const unsigned
 	if (this->type == Extension && detector.extension) {
 		return detector.extension(id, buffer, bufferLength);
 	}
-	
+
 	if (this->type == Plugin && detector.plugin) {
 		detector.plugin->PushString(id);
 		detector.plugin->PushStringEx((char *)buffer, bufferLength, SM_PARAM_STRING_COPY | SM_PARAM_STRING_BINARY, 0);
 		detector.plugin->PushCell(bufferLength);
-	
+
 		cell_t result = 0;
 		detector.plugin->Execute(&result);
-		
+
 		return (IConplex::ProtocolDetectionState)result;
 	}
-	
+
 	return IConplex::NoMatch;
 }
 
@@ -212,18 +212,18 @@ bool ProtocolHandler::ExecuteHandler(int socket, const sockaddr *address, unsign
 	if (this->type == Extension && handler.extension) {
 		return handler.extension(id, socket, address, addressLength);
 	}
-	
+
 	if (this->type == Plugin && handler.plugin) {
 		handler.plugin->PushString(id);
 		handler.plugin->PushCell(handlesys->CreateHandle(handleTypeSocket, new ConplexSocket(socket), owner, myself->GetIdentity(), NULL));
 		handler.plugin->PushString(""); // TODO: inet_ntoa
-	
+
 		cell_t result = 0;
 		handler.plugin->Execute(&result);
-		
+
 		return (result != 0);
 	}
-	
+
 	return false;
 }
 
@@ -241,8 +241,8 @@ CUtlVector<PendingSocket> pendingSockets;
 
 struct ISocketCreatorListener
 {
-	virtual bool ShouldAcceptSocket(int socket, const netadr_t &address) = 0; 
-	virtual void OnSocketAccepted(int socket, const netadr_t &address, void **data) = 0; 
+	virtual bool ShouldAcceptSocket(int socket, const netadr_t &address) = 0;
+	virtual void OnSocketAccepted(int socket, const netadr_t &address, void **data) = 0;
 	virtual void OnSocketClosed(int socket, const netadr_t &address, void *data) = 0;
 };
 
@@ -269,7 +269,7 @@ bool CRConServer::HandleFailedRconAuth(const netadr_t &address)
 #endif
 }
 
-struct CSocketCreator 
+struct CSocketCreator
 {
 	// These are our own functions, they're in here for convenient access to the engine's CSocketCreator variables.
 	void ProcessAccept();
@@ -302,7 +302,7 @@ void CSocketCreator::ProcessAccept()
 	DEBUG_LOG("(%d) New listen socket accepted.", socket);
 
 	int opt = 1;
-	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt)); 
+	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt));
 
 	opt = 1;
 	setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
@@ -387,10 +387,10 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			pendingSockets.Remove(i);
 			continue;
 		}
-		
+
 		int pendingCount = 0;
 		const ProtocolHandler *handler = NULL;
-		
+
 		if (ret > 0)
 		{
 			// TODO: Don't call handlers that have returned NoMatch already on a previous call for this connection.
@@ -399,27 +399,27 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 					i.erase();
 					continue;
 				}
-			
+
 				IConplex::ProtocolDetectionState state = i->ExecuteDetector(buffer, ret);
 				//DEBUG_LOG(">>> %s = %d %d", i->GetId(), ret, state);
-				
+
 				if (state == IConplex::Match) {
 					handler = &(*i);
 					pendingCount = 0;
 					break;
 				}
-				
+
 				if (state == IConplex::NeedMoreData) {
 					if (!handler) {
 						handler = &(*i);
 					}
-				
+
 					pendingCount++;
 					continue;
 				}
 			}
 		}
-		
+
 		if (pendingCount > 1) {
 			handler = NULL;
 		}
@@ -439,7 +439,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 				pendingSockets.Remove(i);
 				continue;
 			}
-		
+
 			pendingSocket->timeout++;
 
 			// About 15 seconds.
@@ -464,7 +464,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 			DEBUG_LOG("(%d) %s handler rejected socket.", pendingSocket->socket, handler->GetId());
 			closesocket(pendingSocket->socket);
 		}
-		
+
 		pendingSockets.Remove(i);
 	}
 }
@@ -500,7 +500,7 @@ bool ConplexRConHandler(const char *id, int socket, const sockaddr *address, uns
 	if (!socketCreator) {
 		return false;
 	}
-	
+
 	socketCreator->HandSocketToEngine(socket, address);
 	return true;
 }
@@ -521,11 +521,11 @@ cell_t ConplexSocket_Send(IPluginContext *context, const cell_t *params)
 	context->LocalToString(params[2], &data);
 
 	ssize_t ret = send(socket->socket, data, params[3], params[4] | MSG_NOSIGNAL);
-	
+
 	if (ret == -1 && SocketWouldBlock()) {
 		return -2;
 	}
-	
+
 	return ret;
 }
 
@@ -545,11 +545,11 @@ cell_t ConplexSocket_Receive(IPluginContext *context, const cell_t *params)
 	context->LocalToString(params[2], &data);
 
 	ssize_t ret = recv(socket->socket, data, params[3], params[4]);
-	
+
 	if (ret == -1 && SocketWouldBlock()) {
 		return -2;
 	}
-	
+
 	return ret;
 }
 
@@ -626,7 +626,7 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		strncpy(error, "Could not add IConplex interface", maxlength);
 		return false;
 	}
-	
+
 	if (!gameconfs->LoadGameConfigFile("conplex.games", &gameConfig, error, maxlength)) {
 		return false;
 	}
@@ -653,15 +653,15 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	}
 
 	detourProcessAccept->EnableDetour();
-	
+
 	if (detourRunFrame) {
 		detourRunFrame->EnableDetour();
 	}
-	
+
 	handleTypeSocket = handlesys->CreateType("ConplexSocket", &handlerSocketType, 0, NULL, NULL, myself->GetIdentity(), NULL);
 
 	sharesys->AddNatives(myself, natives);
-	
+
 	RegisterProtocolHandler("RCon", ConplexRConDetector, ConplexRConHandler);
 
 	return true;
@@ -670,11 +670,11 @@ bool Conplex::SDK_OnLoad(char *error, size_t maxlength, bool late)
 void Conplex::SDK_OnUnload()
 {
 	handlesys->RemoveType(handleTypeSocket, myself->GetIdentity());
-	
+
 	if (detourRunFrame) {
 		detourRunFrame->DisableDetour();
 	}
-	
+
 	detourProcessAccept->DisableDetour();
 
 	gameconfs->CloseGameConfigFile(gameConfig);
