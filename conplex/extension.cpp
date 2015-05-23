@@ -41,6 +41,12 @@ bool shouldHandleProcessAccept;
 CDetour *detourProcessAccept;
 CDetour *detourRunFrame;
 
+#ifndef NDEBUG
+#define DEBUG_LOG rootconsole->ConsolePrint
+#else
+#define DEBUG_LOG(...)
+#endif
+
 struct ConplexSocket {
 	ConplexSocket(int socket);
 	~ConplexSocket();
@@ -293,7 +299,7 @@ void CSocketCreator::ProcessAccept()
 		return;
 	}
 
-	rootconsole->ConsolePrint("(%d) New listen socket accepted.", socket);
+	DEBUG_LOG("(%d) New listen socket accepted.", socket);
 
 	int opt = 1;
 	setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *)&opt, sizeof(opt)); 
@@ -303,7 +309,7 @@ void CSocketCreator::ProcessAccept()
 
 	opt = 1;
 	if (ioctlsocket(socket, FIONBIO, (unsigned long *)&opt) == -1) {
-		rootconsole->ConsolePrint("(%d) Failed to set socket options.", socket);
+		DEBUG_LOG("(%d) Failed to set socket options.", socket);
 		closesocket(socket);
 		return;
 	}
@@ -312,7 +318,7 @@ void CSocketCreator::ProcessAccept()
 	address.SetFromSockadr(&socketAddress);
 
 	if (listener && !listener->ShouldAcceptSocket(socket, address)) {
-		rootconsole->ConsolePrint("(%d) Listener rejected connection.", socket);
+		DEBUG_LOG("(%d) Listener rejected connection.", socket);
 		closesocket(socket);
 		return;
 	}
@@ -367,7 +373,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		ssize_t ret = recv(pendingSocket->socket, (char *)buffer, sizeof(buffer), MSG_PEEK);
 
 		if (ret == 0) {
-			rootconsole->ConsolePrint("(%d) Listen socket closed.", pendingSocket->socket);
+			DEBUG_LOG("(%d) Listen socket closed.", pendingSocket->socket);
 			closesocket(pendingSocket->socket);
 
 			pendingSockets.Remove(i);
@@ -375,7 +381,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		}
 
 		if (ret == -1 && !SocketWouldBlock()) {
-			rootconsole->ConsolePrint("(%d) recv error: %d", WSAGetLastError());
+			DEBUG_LOG("(%d) recv error: %d", WSAGetLastError());
 			closesocket(pendingSocket->socket);
 
 			pendingSockets.Remove(i);
@@ -395,7 +401,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 				}
 			
 				IConplex::ProtocolDetectionState state = i->ExecuteDetector(buffer, ret);
-				rootconsole->ConsolePrint(">>> %s = %d %d", i->GetId(), ret, state);
+				//DEBUG_LOG(">>> %s = %d %d", i->GetId(), ret, state);
 				
 				if (state == IConplex::Match) {
 					handler = &(*i);
@@ -427,7 +433,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 					rconServer->HandleFailedRconAuth(address);
 				}
 
-				rootconsole->ConsolePrint("(%d) Unidentified protocol on socket.", pendingSocket->socket);
+				DEBUG_LOG("(%d) Unidentified protocol on socket.", pendingSocket->socket);
 				closesocket(pendingSocket->socket);
 
 				pendingSockets.Remove(i);
@@ -443,7 +449,7 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 					//rconServer->HandleFailedRconAuth(pendingSocket->address);
 				}
 
-				rootconsole->ConsolePrint("(%d) Listen socket timed out.", pendingSocket->socket);
+				DEBUG_LOG("(%d) Listen socket timed out.", pendingSocket->socket);
 				closesocket(pendingSocket->socket);
 
 				pendingSockets.Remove(i);
@@ -453,9 +459,9 @@ DETOUR_DECL_MEMBER0(ProcessAccept, void)
 		}
 
 		if (handler->ExecuteHandler(pendingSocket->socket, &(pendingSocket->socketAddress), pendingSocket->socketAddressLength)) {
-			rootconsole->ConsolePrint("(%d) Gave %s socket to handler.", pendingSocket->socket, handler->GetId());
+			DEBUG_LOG("(%d) Gave %s socket to handler.", pendingSocket->socket, handler->GetId());
 		} else {
-			rootconsole->ConsolePrint("(%d) %s handler rejected socket.", pendingSocket->socket, handler->GetId());
+			DEBUG_LOG("(%d) %s handler rejected socket.", pendingSocket->socket, handler->GetId());
 			closesocket(pendingSocket->socket);
 		}
 		
