@@ -216,7 +216,7 @@ bool ProtocolHandler::ExecuteHandler(int socket, const sockaddr *address, unsign
 	if (this->type == Plugin && handler.plugin) {
 		handler.plugin->PushString(id);
 		handler.plugin->PushCell(handlesys->CreateHandle(handleTypeSocket, new ConplexSocket(socket), owner, myself->GetIdentity(), NULL));
-		handler.plugin->PushString(""); // TODO: inet_ntoa
+		handler.plugin->PushString(inet_ntoa(((sockaddr_in *)address)->sin_addr));
 
 		cell_t result = 0;
 		handler.plugin->Execute(&result);
