@@ -36,7 +36,7 @@ CopyFiles('webcon', 'addons/sourcemod/scripting/include', ['webcon.inc'])
 
 # Test Plugins
 CopyFiles('webcon', 'addons/sourcemod/scripting', ['webcon.sp'])
-CopyFiles('conplex', 'addons/sourcemod/scripting', ['conplex.sp'])
+#CopyFiles('conplex', 'addons/sourcemod/scripting', ['conplex.sp'])
 
 # Scoreboard Plugin
 CopyFiles('samples/scoreboard', 'addons/sourcemod/scripting', ['webscoreboard.sp'])
@@ -44,3 +44,6 @@ CopyFiles('samples/scoreboard', 'addons/sourcemod/configs/web/scoreboard', ['ind
 
 # Manager Plugin
 CopyFiles('samples/manager', 'addons/sourcemod/scripting', ['webmanager.sp'])
+
+# IRC Server Plugin
+CopyFiles('samples/irc', 'addons/sourcemod/scripting', ['irc.sp'])
