@@ -8,7 +8,6 @@
 #include <io.h>
 #include <Winsock2.h>
 #include <Ws2tcpip.h>
-#define MSG_NOSIGNAL 0
 #else
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -24,6 +23,10 @@
 #define _SSIZE_T_DEFINED
 typedef intptr_t ssize_t;
 #endif // !_SSIZE_T_DEFINED */
+
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
 
 // tier1 supremecy
 #include "utlvector.h"
@@ -306,6 +309,11 @@ void CSocketCreator::ProcessAccept()
 
 	opt = 1;
 	setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+
+#ifdef SO_NOSIGPIPE
+	opt = 1;
+	setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, (char *)&opt, sizeof(opt));
+#endif
 
 	opt = 1;
 	if (ioctlsocket(socket, FIONBIO, (unsigned long *)&opt) == -1) {
