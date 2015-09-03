@@ -168,6 +168,7 @@ class WebconConfig(object):
     # Platform-specifics
     if builder.target_platform == 'linux':
       cxx.defines += ['_LINUX', 'POSIX']
+      cxx.linkflags += ['-lrt']
       if cxx.vendor == 'gcc':
         cxx.linkflags += ['-static-libgcc']
       elif cxx.vendor == 'clang':
